@@ -4,7 +4,7 @@ using MediatR;
 
 namespace DocumentIntelligence.Api;
 
-public record AskRequestDto(string Question, int TopK);
+public record AskRequestDto(string Question, int TopK, string? Mode);
 
 public static class AskEndpoints
 {
@@ -28,13 +28,17 @@ public static class AskEndpoints
             }
 
             var topK = request.TopK <= 0 ? 5 : Math.Min(request.TopK, 10);
+            var mode = string.Equals(request.Mode, "hybrid", StringComparison.OrdinalIgnoreCase)
+                ? AskSearchMode.Hybrid
+                : AskSearchMode.Vector;
 
             var command = new AskQuestionCommand(
                 tenantId,
                 workspaceId,
                 userId,
                 request.Question,
-                topK);
+                topK,
+                mode);
 
             var result = await mediator.Send(command, ct);
             return Results.Ok(result);

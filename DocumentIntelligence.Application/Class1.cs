@@ -115,7 +115,8 @@ public record UploadDocumentCommand(
 public record AskRequest(
     Guid WorkspaceId,
     string Question,
-    int TopK
+    int TopK,
+    string? Mode
 );
 
 public record AskResponse(
@@ -123,12 +124,19 @@ public record AskResponse(
     IReadOnlyList<DocumentDto> Sources
 );
 
+public enum AskSearchMode
+{
+    Vector = 1,
+    Hybrid = 2
+}
+
 public record AskQuestionCommand(
     Guid TenantId,
     Guid WorkspaceId,
     Guid UserId,
     string Question,
-    int TopK
+    int TopK,
+    AskSearchMode Mode
 ) : IRequest<AskResponse>;
 
 public record RetrievalChunkDto(Guid ChunkId, string Content, Guid DocumentId, string FileName);
@@ -139,6 +147,8 @@ public interface IVectorSearchService
         Guid tenantId,
         Guid workspaceId,
         float[] queryEmbedding,
+        string question,
+        AskSearchMode mode,
         int topK,
         CancellationToken cancellationToken);
 }
@@ -447,6 +457,8 @@ public class AskQuestionCommandHandler : IRequestHandler<AskQuestionCommand, Ask
             request.TenantId,
             request.WorkspaceId,
             questionEmbedding,
+            request.Question,
+            request.Mode,
             topK,
             cancellationToken);
 

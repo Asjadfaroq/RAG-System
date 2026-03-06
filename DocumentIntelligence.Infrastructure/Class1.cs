@@ -237,6 +237,28 @@ public class SupabaseStorageService : IStorageService
         _configuration = configuration;
     }
 
+    private static string SanitizeStorageFileName(string fileName)
+    {
+        var baseName = Path.GetFileName(fileName);
+        var sanitized = new string(
+            baseName
+                .Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '_' ? c : '-')
+                .ToArray());
+
+        while (sanitized.Contains("--", StringComparison.Ordinal))
+        {
+            sanitized = sanitized.Replace("--", "-", StringComparison.Ordinal);
+        }
+
+        sanitized = sanitized.Trim('-', '.');
+        if (string.IsNullOrWhiteSpace(sanitized))
+        {
+            sanitized = "document.pdf";
+        }
+
+        return sanitized;
+    }
+
     public async Task<string> UploadDocumentAsync(
         Guid tenantId,
         Guid workspaceId,
@@ -249,7 +271,7 @@ public class SupabaseStorageService : IStorageService
         var serviceKey = (_configuration["SUPABASE_SERVICE_ROLE_KEY"] ?? throw new InvalidOperationException("SUPABASE_SERVICE_ROLE_KEY is not configured.")).Trim();
         var bucket = (_configuration["SUPABASE_BUCKET"] ?? "documents").Trim();
 
-        var safeFileName = fileName.Replace(" ", "-");
+        var safeFileName = SanitizeStorageFileName(fileName);
         var objectPath = $"tenants/{tenantId}/workspaces/{workspaceId}/{Guid.NewGuid()}_{safeFileName}";
 
         var baseUri = new Uri(baseUrl, UriKind.Absolute);
@@ -416,25 +438,55 @@ public class VectorSearchService : IVectorSearchService
         Guid tenantId,
         Guid workspaceId,
         float[] queryEmbedding,
+        string question,
+        AskSearchMode mode,
         int topK,
         CancellationToken cancellationToken)
     {
         var vector = new Vector(queryEmbedding);
-        var results = await _db.Database
-            .SqlQueryRaw<RetrievalChunkDto>(
-                """
-                SELECT c."Id" AS "ChunkId", c."Content", c."DocumentId", d."FileName"
-                FROM "DocumentChunks" c
-                INNER JOIN "Documents" d ON d."Id" = c."DocumentId"
-                WHERE c."TenantId" = {0} AND d."WorkspaceId" = {1} AND c."Embedding" IS NOT NULL
-                ORDER BY c."Embedding" <-> {2}
-                LIMIT {3}
-                """,
-                tenantId,
-                workspaceId,
-                vector,
-                topK)
-            .ToListAsync(cancellationToken);
+        var results = mode == AskSearchMode.Hybrid
+            ? await _db.Database
+                .SqlQueryRaw<RetrievalChunkDto>(
+                    """
+                    SELECT sub."ChunkId", sub."Content", sub."DocumentId", sub."FileName"
+                    FROM (
+                        SELECT
+                            c."Id" AS "ChunkId",
+                            c."Content",
+                            c."DocumentId",
+                            d."FileName",
+                            ((1 - (c."Embedding" <=> {2})) * 0.7
+                             + ts_rank_cd(to_tsvector('simple', c."Content"), plainto_tsquery('simple', {3})) * 0.3) AS score
+                        FROM "DocumentChunks" c
+                        INNER JOIN "Documents" d ON d."Id" = c."DocumentId"
+                        WHERE c."TenantId" = {0}
+                          AND d."WorkspaceId" = {1}
+                          AND c."Embedding" IS NOT NULL
+                    ) sub
+                    ORDER BY sub.score DESC
+                    LIMIT {4}
+                    """,
+                    tenantId,
+                    workspaceId,
+                    vector,
+                    question,
+                    topK)
+                .ToListAsync(cancellationToken)
+            : await _db.Database
+                .SqlQueryRaw<RetrievalChunkDto>(
+                    """
+                    SELECT c."Id" AS "ChunkId", c."Content", c."DocumentId", d."FileName"
+                    FROM "DocumentChunks" c
+                    INNER JOIN "Documents" d ON d."Id" = c."DocumentId"
+                    WHERE c."TenantId" = {0} AND d."WorkspaceId" = {1} AND c."Embedding" IS NOT NULL
+                    ORDER BY c."Embedding" <-> {2}
+                    LIMIT {3}
+                    """,
+                    tenantId,
+                    workspaceId,
+                    vector,
+                    topK)
+                .ToListAsync(cancellationToken);
 
         return results;
     }
@@ -519,21 +571,26 @@ public class DocumentIngestionWorker : BackgroundService
                     }
 
                     var normalized = text.Trim();
-                    var embedding = await embeddingService.GetEmbeddingAsync(normalized, stoppingToken);
-
-                    var chunk = new DocumentChunk
+                    var pageChunks = SplitTextIntoChunks(normalized, 900, 150);
+                    var partIndex = 0;
+                    foreach (var chunkText in pageChunks)
                     {
-                        Id = Guid.NewGuid(),
-                        DocumentId = document.Id,
-                        TenantId = document.TenantId,
-                        PageNumber = page.Number,
-                        ChunkIndex = chunkIndex++,
-                        Content = normalized,
-                        Embedding = embedding,
-                        MetadataJson = null
-                    };
+                        var embedding = await embeddingService.GetEmbeddingAsync(chunkText, stoppingToken);
 
-                    chunks.Add(chunk);
+                        var chunk = new DocumentChunk
+                        {
+                            Id = Guid.NewGuid(),
+                            DocumentId = document.Id,
+                            TenantId = document.TenantId,
+                            PageNumber = page.Number,
+                            ChunkIndex = chunkIndex++,
+                            Content = chunkText,
+                            Embedding = embedding,
+                            MetadataJson = $"{{\"page\":{page.Number},\"part\":{partIndex++}}}"
+                        };
+
+                        chunks.Add(chunk);
+                    }
                 }
 
                 if (chunks.Count > 0)
@@ -550,5 +607,52 @@ public class DocumentIngestionWorker : BackgroundService
                 await db.SaveChangesAsync(stoppingToken);
             }
         }
+    }
+
+    private static IReadOnlyList<string> SplitTextIntoChunks(string text, int chunkSize, int overlap)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return [];
+        }
+
+        var compact = string.Join(' ', text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (compact.Length <= chunkSize)
+        {
+            return [compact];
+        }
+
+        var chunks = new List<string>();
+        var step = Math.Max(1, chunkSize - overlap);
+        var start = 0;
+
+        while (start < compact.Length)
+        {
+            var length = Math.Min(chunkSize, compact.Length - start);
+            var end = start + length;
+            if (end < compact.Length)
+            {
+                var lastSpace = compact.LastIndexOf(' ', end - 1, length);
+                if (lastSpace > start + (chunkSize / 2))
+                {
+                    end = lastSpace;
+                }
+            }
+
+            var chunk = compact[start..end].Trim();
+            if (!string.IsNullOrWhiteSpace(chunk))
+            {
+                chunks.Add(chunk);
+            }
+
+            if (end >= compact.Length)
+            {
+                break;
+            }
+
+            start = Math.Max(0, end - overlap);
+        }
+
+        return chunks;
     }
 }
