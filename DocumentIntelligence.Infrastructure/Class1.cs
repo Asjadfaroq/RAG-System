@@ -10,6 +10,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using UglyToad.PdfPig;
+using UglyToad.PdfPig.Content;
 
 namespace DocumentIntelligence.Infrastructure;
 
@@ -288,11 +290,11 @@ public class DocumentIngestionWorker : BackgroundService
     {
         await foreach (var message in _queue.Reader.ReadAllAsync(stoppingToken))
         {
-            // TODO: Implement real ingestion (download from storage, extract text, chunk, embed).
-            // For now, just mark document as Ready to keep the pipeline functioning.
-
             using var scope = _serviceProvider.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+            var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
+            var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
+            var httpClient = httpClientFactory.CreateClient(nameof(SupabaseStorageService));
 
             var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == message.DocumentId, stoppingToken);
             if (document is null)
@@ -300,8 +302,66 @@ public class DocumentIngestionWorker : BackgroundService
                 continue;
             }
 
-            document.Status = DocumentStatus.Ready;
-            await db.SaveChangesAsync(stoppingToken);
+            try
+            {
+                var baseUrl = (configuration["SUPABASE_URL"] ?? throw new InvalidOperationException("SUPABASE_URL is not configured.")).Trim();
+                var serviceKey = (configuration["SUPABASE_SERVICE_ROLE_KEY"] ?? throw new InvalidOperationException("SUPABASE_SERVICE_ROLE_KEY is not configured.")).Trim();
+                var bucket = (configuration["SUPABASE_BUCKET"] ?? "documents").Trim();
+
+                var baseUri = new Uri(baseUrl, UriKind.Absolute);
+                var objectUri = new Uri(baseUri, $"/storage/v1/object/{document.StoragePath}");
+
+                using var requestMessage = new HttpRequestMessage(HttpMethod.Get, objectUri);
+                requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceKey);
+
+                var response = await httpClient.SendAsync(requestMessage, stoppingToken);
+                response.EnsureSuccessStatusCode();
+
+                await using var pdfStream = await response.Content.ReadAsStreamAsync(stoppingToken);
+
+                using var pdf = PdfDocument.Open(pdfStream);
+
+                var chunks = new List<DocumentChunk>();
+                var chunkIndex = 0;
+
+                foreach (var page in pdf.GetPages())
+                {
+                    var text = page.Text;
+                    if (string.IsNullOrWhiteSpace(text))
+                    {
+                        continue;
+                    }
+
+                    var normalized = text.Trim();
+
+                    var chunk = new DocumentChunk
+                    {
+                        Id = Guid.NewGuid(),
+                        DocumentId = document.Id,
+                        TenantId = document.TenantId,
+                        PageNumber = page.Number,
+                        ChunkIndex = chunkIndex++,
+                        Content = normalized,
+                        Embedding = null,
+                        MetadataJson = null
+                    };
+
+                    chunks.Add(chunk);
+                }
+
+                if (chunks.Count > 0)
+                {
+                    await db.AddRangeAsync(chunks, stoppingToken);
+                }
+
+                document.Status = DocumentStatus.Ready;
+                await db.SaveChangesAsync(stoppingToken);
+            }
+            catch
+            {
+                document.Status = DocumentStatus.Failed;
+                await db.SaveChangesAsync(stoppingToken);
+            }
         }
     }
 }
