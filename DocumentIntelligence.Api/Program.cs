@@ -20,6 +20,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
+builder.Services.AddHttpClient<IStorageService, SupabaseStorageService>();
+builder.Services.AddSingleton<IIngestionQueue, InMemoryIngestionQueue>();
+builder.Services.AddHostedService<DocumentIngestionWorker>();
 
 builder.Services.AddMediatR(cfg =>
 {

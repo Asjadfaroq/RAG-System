@@ -10,6 +10,7 @@ public record CreateDocumentRequest(
     string FileName,
     string StoragePath,
     string? Language);
+public record UploadDocumentResponse(DocumentDto Document);
 
 public static class DocumentEndpoints
 {
@@ -49,6 +50,34 @@ public static class DocumentEndpoints
             return Results.Ok(created);
         })
         .RequireAuthorization(policy => policy.RequireRole("Owner", "Admin", "Member"));
+
+        group.MapPost("/upload", async (Guid workspaceId, IFormFile file, string? language, ClaimsPrincipal user, IMediator mediator, CancellationToken ct) =>
+        {
+            var tenantIdClaim = user.FindFirst("tenantId")?.Value;
+            if (!Guid.TryParse(tenantIdClaim, out var tenantId))
+            {
+                return Results.Unauthorized();
+            }
+
+            if (file == null || file.Length == 0)
+            {
+                return Results.BadRequest("File is required.");
+            }
+
+            await using var stream = file.OpenReadStream();
+
+            var command = new UploadDocumentCommand(
+                tenantId,
+                workspaceId,
+                file.FileName,
+                stream,
+                language);
+
+            var document = await mediator.Send(command, ct);
+            return Results.Ok(new UploadDocumentResponse(document));
+        })
+        .DisableAntiforgery()
+        .Accepts<IFormFile>("multipart/form-data");
 
         return routes;
     }

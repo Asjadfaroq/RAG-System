@@ -51,6 +51,22 @@ public interface IJwtTokenGenerator
     string GenerateToken(User user);
 }
 
+public interface IStorageService
+{
+    Task<string> UploadDocumentAsync(
+        Guid tenantId,
+        Guid workspaceId,
+        string fileName,
+        Stream content,
+        CancellationToken cancellationToken);
+}
+
+public record DocumentIngestionMessage(Guid DocumentId, Guid TenantId);
+
+public interface IIngestionQueue
+{
+    Task EnqueueAsync(DocumentIngestionMessage message, CancellationToken cancellationToken);
+}
 public interface IApplicationDbContext
 {
     IQueryable<Tenant> Tenants { get; }
@@ -75,6 +91,14 @@ public record CreateDocumentCommand(
     Guid WorkspaceId,
     string FileName,
     string StoragePath,
+    string? Language
+) : IRequest<DocumentDto>;
+
+public record UploadDocumentCommand(
+    Guid TenantId,
+    Guid WorkspaceId,
+    string FileName,
+    Stream Content,
     string? Language
 ) : IRequest<DocumentDto>;
 
@@ -288,6 +312,59 @@ public class CreateDocumentCommandHandler : IRequestHandler<CreateDocumentComman
 
         await _db.AddAsync(document, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
+
+        return new DocumentDto(
+            document.Id,
+            document.WorkspaceId,
+            document.FileName,
+            document.StoragePath,
+            document.Language,
+            document.Status,
+            document.CreatedAt);
+    }
+}
+
+public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentCommand, DocumentDto>
+{
+    private readonly IApplicationDbContext _db;
+    private readonly IStorageService _storage;
+    private readonly IIngestionQueue _queue;
+
+    public UploadDocumentCommandHandler(
+        IApplicationDbContext db,
+        IStorageService storage,
+        IIngestionQueue queue)
+    {
+        _db = db;
+        _storage = storage;
+        _queue = queue;
+    }
+
+    public async Task<DocumentDto> Handle(UploadDocumentCommand request, CancellationToken cancellationToken)
+    {
+        var storagePath = await _storage.UploadDocumentAsync(
+            request.TenantId,
+            request.WorkspaceId,
+            request.FileName,
+            request.Content,
+            cancellationToken);
+
+        var document = new Document
+        {
+            Id = Guid.NewGuid(),
+            TenantId = request.TenantId,
+            WorkspaceId = request.WorkspaceId,
+            FileName = request.FileName,
+            StoragePath = storagePath,
+            Language = request.Language,
+            Status = DocumentStatus.Uploaded,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _db.AddAsync(document, cancellationToken);
+        await _db.SaveChangesAsync(cancellationToken);
+
+        await _queue.EnqueueAsync(new DocumentIngestionMessage(document.Id, document.TenantId), cancellationToken);
 
         return new DocumentDto(
             document.Id,

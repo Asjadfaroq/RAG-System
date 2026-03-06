@@ -1,9 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading.Channels;
 using DocumentIntelligence.Application;
 using DocumentIntelligence.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -203,5 +206,102 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             signingCredentials: creds);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+}
+
+public class SupabaseStorageService : IStorageService
+{
+    private readonly HttpClient _httpClient;
+    private readonly IConfiguration _configuration;
+
+    public SupabaseStorageService(HttpClient httpClient, IConfiguration configuration)
+    {
+        _httpClient = httpClient;
+        _configuration = configuration;
+    }
+
+    public async Task<string> UploadDocumentAsync(
+        Guid tenantId,
+        Guid workspaceId,
+        string fileName,
+        Stream content,
+        CancellationToken cancellationToken)
+    {
+        var baseUrl = (_configuration["SUPABASE_URL"] ?? throw new InvalidOperationException("SUPABASE_URL is not configured.")).Trim();
+        var anonKey = (_configuration["SUPABASE_ANON_KEY"] ?? throw new InvalidOperationException("SUPABASE_ANON_KEY is not configured.")).Trim();
+        var serviceKey = (_configuration["SUPABASE_SERVICE_ROLE_KEY"] ?? throw new InvalidOperationException("SUPABASE_SERVICE_ROLE_KEY is not configured.")).Trim();
+        var bucket = (_configuration["SUPABASE_BUCKET"] ?? "documents").Trim();
+
+        var safeFileName = fileName.Replace(" ", "-");
+        var objectPath = $"tenants/{tenantId}/workspaces/{workspaceId}/{Guid.NewGuid()}_{safeFileName}";
+
+        var baseUri = new Uri(baseUrl, UriKind.Absolute);
+        var objectUri = new Uri(baseUri, $"/storage/v1/object/{bucket}/{objectPath}");
+
+        using var requestMessage = new HttpRequestMessage(HttpMethod.Post, objectUri)
+        {
+            Content = new StreamContent(content)
+        };
+        requestMessage.Headers.Add("apikey", anonKey);
+        requestMessage.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceKey);
+
+        var response = await _httpClient.SendAsync(requestMessage, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Failed to upload to Supabase Storage. Status: {response.StatusCode}, Body: {body}");
+        }
+
+        return $"{bucket}/{objectPath}";
+    }
+}
+
+public class InMemoryIngestionQueue : IIngestionQueue
+{
+    private readonly Channel<DocumentIngestionMessage> _channel;
+
+    public InMemoryIngestionQueue()
+    {
+        _channel = Channel.CreateUnbounded<DocumentIngestionMessage>();
+    }
+
+    public async Task EnqueueAsync(DocumentIngestionMessage message, CancellationToken cancellationToken)
+    {
+        await _channel.Writer.WriteAsync(message, cancellationToken);
+    }
+
+    public ChannelReader<DocumentIngestionMessage> Reader => _channel.Reader;
+}
+
+public class DocumentIngestionWorker : BackgroundService
+{
+    private readonly IServiceProvider _serviceProvider;
+    private readonly InMemoryIngestionQueue _queue;
+
+    public DocumentIngestionWorker(IServiceProvider serviceProvider, IIngestionQueue queue)
+    {
+        _serviceProvider = serviceProvider;
+        _queue = (InMemoryIngestionQueue)queue;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        await foreach (var message in _queue.Reader.ReadAllAsync(stoppingToken))
+        {
+            // TODO: Implement real ingestion (download from storage, extract text, chunk, embed).
+            // For now, just mark document as Ready to keep the pipeline functioning.
+
+            using var scope = _serviceProvider.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == message.DocumentId, stoppingToken);
+            if (document is null)
+            {
+                continue;
+            }
+
+            document.Status = DocumentStatus.Ready;
+            await db.SaveChangesAsync(stoppingToken);
+        }
     }
 }
