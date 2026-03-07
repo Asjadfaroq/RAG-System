@@ -19,6 +19,7 @@ public static class AskEndpoints
             AskRequestDto request,
             ClaimsPrincipal user,
             IMediator mediator,
+            ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
             var tenantIdClaim = user.FindFirst("tenantId")?.Value;
@@ -50,6 +51,12 @@ public static class AskEndpoints
                 languageHint);
 
             var result = await mediator.Send(command, ct);
+
+            var log = loggerFactory.CreateLogger("DocumentIntelligence.Ask");
+            log.LogInformation(
+                "Ask completed: WorkspaceId={WorkspaceId}, TenantId={TenantId}, LatencyMs={LatencyMs}, SourceCount={SourceCount}",
+                workspaceId, tenantId, result.LatencyMs, result.Sources.Count);
+
             return Results.Ok(result);
         });
 

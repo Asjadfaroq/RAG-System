@@ -89,6 +89,13 @@ public interface IIngestionQueue
 {
     Task EnqueueAsync(DocumentIngestionMessage message, CancellationToken cancellationToken);
 }
+
+/// <summary>In-memory or distributed cache for workspace/document lists and other frequently accessed data.</summary>
+public interface ICacheService
+{
+    Task<T> GetOrSetAsync<T>(string key, TimeSpan ttl, Func<CancellationToken, Task<T>> factory, CancellationToken cancellationToken = default);
+    Task InvalidateAsync(string key, CancellationToken cancellationToken = default);
+}
 public interface IApplicationDbContext
 {
     IQueryable<Tenant> Tenants { get; }
@@ -133,7 +140,8 @@ public record AskRequest(
 
 public record AskResponse(
     string Answer,
-    IReadOnlyList<DocumentDto> Sources
+    IReadOnlyList<DocumentDto> Sources,
+    int LatencyMs
 );
 
 public enum AskSearchMode
@@ -314,32 +322,41 @@ public class RefreshCommandHandler : IRequestHandler<RefreshCommand, AuthResult>
 public class GetWorkspacesQueryHandler : IRequestHandler<GetWorkspacesQuery, IReadOnlyList<WorkspaceDto>>
 {
     private readonly IApplicationDbContext _db;
+    private readonly ICacheService _cache;
 
-    public GetWorkspacesQueryHandler(IApplicationDbContext db)
+    private static readonly TimeSpan WorkspacesCacheTtl = TimeSpan.FromSeconds(60);
+
+    public GetWorkspacesQueryHandler(IApplicationDbContext db, ICacheService cache)
     {
         _db = db;
+        _cache = cache;
     }
 
-    public Task<IReadOnlyList<WorkspaceDto>> Handle(GetWorkspacesQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<WorkspaceDto>> Handle(GetWorkspacesQuery request, CancellationToken cancellationToken)
     {
-        var workspaces = _db.Workspaces
-            .Where(w => w.TenantId == request.TenantId)
-            .OrderBy(w => w.CreatedAt)
-            .Select(w => new WorkspaceDto(w.Id, w.Name, w.Description, w.CreatedAt))
-            .ToList()
-            .AsReadOnly();
-
-        return Task.FromResult<IReadOnlyList<WorkspaceDto>>(workspaces);
+        var key = $"workspaces:tenant:{request.TenantId:N}";
+        return await _cache.GetOrSetAsync(key, WorkspacesCacheTtl, async ct =>
+        {
+            var list = _db.Workspaces
+                .Where(w => w.TenantId == request.TenantId)
+                .OrderBy(w => w.CreatedAt)
+                .Select(w => new WorkspaceDto(w.Id, w.Name, w.Description, w.CreatedAt))
+                .ToList()
+                .AsReadOnly();
+            return await Task.FromResult(list);
+        }, cancellationToken);
     }
 }
 
 public class CreateWorkspaceCommandHandler : IRequestHandler<CreateWorkspaceCommand, WorkspaceDto>
 {
     private readonly IApplicationDbContext _db;
+    private readonly ICacheService _cache;
 
-    public CreateWorkspaceCommandHandler(IApplicationDbContext db)
+    public CreateWorkspaceCommandHandler(IApplicationDbContext db, ICacheService cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     public async Task<WorkspaceDto> Handle(CreateWorkspaceCommand request, CancellationToken cancellationToken)
@@ -356,6 +373,8 @@ public class CreateWorkspaceCommandHandler : IRequestHandler<CreateWorkspaceComm
         await _db.AddAsync(workspace, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
 
+        await _cache.InvalidateAsync($"workspaces:tenant:{request.TenantId:N}", cancellationToken);
+
         return new WorkspaceDto(workspace.Id, workspace.Name, workspace.Description, workspace.CreatedAt);
     }
 }
@@ -363,29 +382,36 @@ public class CreateWorkspaceCommandHandler : IRequestHandler<CreateWorkspaceComm
 public class GetDocumentsQueryHandler : IRequestHandler<GetDocumentsQuery, IReadOnlyList<DocumentDto>>
 {
     private readonly IApplicationDbContext _db;
+    private readonly ICacheService _cache;
 
-    public GetDocumentsQueryHandler(IApplicationDbContext db)
+    private static readonly TimeSpan DocumentsCacheTtl = TimeSpan.FromSeconds(60);
+
+    public GetDocumentsQueryHandler(IApplicationDbContext db, ICacheService cache)
     {
         _db = db;
+        _cache = cache;
     }
 
-    public Task<IReadOnlyList<DocumentDto>> Handle(GetDocumentsQuery request, CancellationToken cancellationToken)
+    public async Task<IReadOnlyList<DocumentDto>> Handle(GetDocumentsQuery request, CancellationToken cancellationToken)
     {
-        var docs = _db.Documents
-            .Where(d => d.TenantId == request.TenantId && d.WorkspaceId == request.WorkspaceId)
-            .OrderByDescending(d => d.CreatedAt)
-            .Select(d => new DocumentDto(
-                d.Id,
-                d.WorkspaceId,
-                d.FileName,
-                d.StoragePath,
-                d.Language,
-                d.Status,
-                d.CreatedAt))
-            .ToList()
-            .AsReadOnly();
-
-        return Task.FromResult<IReadOnlyList<DocumentDto>>(docs);
+        var key = $"documents:tenant:{request.TenantId:N}:workspace:{request.WorkspaceId:N}";
+        return await _cache.GetOrSetAsync(key, DocumentsCacheTtl, async ct =>
+        {
+            var list = _db.Documents
+                .Where(d => d.TenantId == request.TenantId && d.WorkspaceId == request.WorkspaceId)
+                .OrderByDescending(d => d.CreatedAt)
+                .Select(d => new DocumentDto(
+                    d.Id,
+                    d.WorkspaceId,
+                    d.FileName,
+                    d.StoragePath,
+                    d.Language,
+                    d.Status,
+                    d.CreatedAt))
+                .ToList()
+                .AsReadOnly();
+            return await Task.FromResult(list);
+        }, cancellationToken);
     }
 }
 
@@ -431,15 +457,18 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
     private readonly IApplicationDbContext _db;
     private readonly IStorageService _storage;
     private readonly IIngestionQueue _queue;
+    private readonly ICacheService _cache;
 
     public UploadDocumentCommandHandler(
         IApplicationDbContext db,
         IStorageService storage,
-        IIngestionQueue queue)
+        IIngestionQueue queue,
+        ICacheService cache)
     {
         _db = db;
         _storage = storage;
         _queue = queue;
+        _cache = cache;
     }
 
     public async Task<DocumentDto> Handle(UploadDocumentCommand request, CancellationToken cancellationToken)
@@ -466,6 +495,7 @@ public class UploadDocumentCommandHandler : IRequestHandler<UploadDocumentComman
         await _db.AddAsync(document, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
 
+        await _cache.InvalidateAsync($"documents:tenant:{request.TenantId:N}:workspace:{request.WorkspaceId:N}", cancellationToken);
         await _queue.EnqueueAsync(new DocumentIngestionMessage(document.Id, document.TenantId), cancellationToken);
 
         return new DocumentDto(
@@ -558,6 +588,6 @@ public class AskQuestionCommandHandler : IRequestHandler<AskQuestionCommand, Ask
         await _db.AddAsync(answer, cancellationToken);
         await _db.SaveChangesAsync(cancellationToken);
 
-        return new AskResponse(answerText, docs);
+        return new AskResponse(answerText, docs, (int)sw.ElapsedMilliseconds);
     }
 }

@@ -31,6 +31,7 @@ type SourceDocument = {
 type AskResponse = {
   answer: string;
   sources: SourceDocument[];
+  latencyMs?: number;
 };
 
 type ChatItem = {

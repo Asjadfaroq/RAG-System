@@ -51,8 +51,16 @@ public static class DocumentEndpoints
         })
         .RequireAuthorization(policy => policy.RequireRole("Owner", "Admin", "Member"));
 
-        group.MapPost("/upload", async (string workspaceId, IFormFile file, string? language, ClaimsPrincipal user, IMediator mediator, CancellationToken ct) =>
+        group.MapPost("/upload", async (
+            string workspaceId,
+            IFormFile file,
+            string? language,
+            ClaimsPrincipal user,
+            IMediator mediator,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
         {
+            var log = loggerFactory.CreateLogger("DocumentIntelligence.Documents");
             var tenantIdClaim = user.FindFirst("tenantId")?.Value;
             if (!Guid.TryParse(tenantIdClaim, out var tenantId))
             {
@@ -78,8 +86,19 @@ public static class DocumentEndpoints
                 stream,
                 language);
 
-            var document = await mediator.Send(command, ct);
-            return Results.Ok(new UploadDocumentResponse(document));
+            try
+            {
+                var document = await mediator.Send(command, ct);
+                log.LogInformation(
+                    "Document uploaded and enqueued: DocumentId={DocumentId}, WorkspaceId={WorkspaceId}, FileName={FileName}, TenantId={TenantId}",
+                    document.Id, workspaceGuid, file.FileName, tenantId);
+                return Results.Ok(new UploadDocumentResponse(document));
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Document upload failed: FileName={FileName}, WorkspaceId={WorkspaceId}", file.FileName, workspaceGuid);
+                throw;
+            }
         })
         .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data");

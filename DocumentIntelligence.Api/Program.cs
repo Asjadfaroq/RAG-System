@@ -6,8 +6,25 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Serilog: enrichers (CorrelationId from LogContext in middleware), machine, environment
+builder.Host.UseSerilog((ctx, cfg) =>
+{
+    cfg
+        .ReadFrom.Configuration(ctx.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "DocumentIntelligence.Api")
+        .Enrich.WithMachineName()
+        .Enrich.WithEnvironmentName();
+    if (ctx.HostingEnvironment.IsDevelopment())
+        cfg.WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {CorrelationId} {Message:lj}{NewLine}{Exception}");
+    else
+        cfg.WriteTo.Console();
+});
+builder.Services.AddSerilog();
 
 builder.Services.AddOpenApi();
 builder.Services.AddCors(options =>
@@ -40,6 +57,8 @@ var connectionString = builder.Configuration.GetConnectionString("Default");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
 
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -88,12 +107,30 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseMiddleware<ExceptionLoggingMiddleware>();
+app.UseSerilogRequestLogging(options =>
+{
+    options.MessageTemplate = "HTTP {RequestMethod} {RequestPath} => {StatusCode}";
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        if (httpContext.Items.TryGetValue(CorrelationIdMiddleware.CorrelationIdItemKey, out var correlationId))
+            diagnosticContext.Set("CorrelationId", correlationId);
+    };
+});
 app.UseCors("WebClient");
 app.UseAuthentication();
 app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+app.MapGet("/metrics/basic", async (ApplicationDbContext db, CancellationToken ct) =>
+{
+    var documentsCount = await db.Documents.CountAsync(ct);
+    var questionsCount = await db.Questions.CountAsync(ct);
+    return Results.Ok(new { documentsCount, questionsCount });
+});
 
 app.MapAuth();
 app.MapWorkspaces();

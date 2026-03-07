@@ -7,9 +7,11 @@ using DocumentIntelligence.Domain;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Pgvector;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -607,6 +609,32 @@ public class InMemoryIngestionQueue : IIngestionQueue
     public ChannelReader<DocumentIngestionMessage> Reader => _channel.Reader;
 }
 
+public sealed class InMemoryCacheService : ICacheService
+{
+    private readonly IMemoryCache _cache;
+
+    public InMemoryCacheService(IMemoryCache cache)
+    {
+        _cache = cache;
+    }
+
+    public async Task<T> GetOrSetAsync<T>(string key, TimeSpan ttl, Func<CancellationToken, Task<T>> factory, CancellationToken cancellationToken = default)
+    {
+        if (_cache.TryGetValue(key, out T? cached) && cached is not null)
+            return cached;
+
+        var value = await factory(cancellationToken);
+        _cache.Set(key, value, new MemoryCacheEntryOptions().SetAbsoluteExpiration(ttl));
+        return value;
+    }
+
+    public Task InvalidateAsync(string key, CancellationToken cancellationToken = default)
+    {
+        _cache.Remove(key);
+        return Task.CompletedTask;
+    }
+}
+
 public class DocumentIngestionWorker : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;
@@ -627,18 +655,28 @@ public class DocumentIngestionWorker : BackgroundService
             var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
             var httpClientFactory = scope.ServiceProvider.GetRequiredService<IHttpClientFactory>();
             var embeddingService = scope.ServiceProvider.GetRequiredService<IEmbeddingService>();
+            var log = scope.ServiceProvider.GetRequiredService<ILogger<DocumentIngestionWorker>>();
 
             var document = await db.Documents.FirstOrDefaultAsync(d => d.Id == message.DocumentId, stoppingToken);
             if (document is null)
             {
+                log.LogWarning("Ingestion skipped: DocumentId={DocumentId} not found", message.DocumentId);
                 continue;
             }
 
-            document.Status = DocumentStatus.Processing;
-            await db.SaveChangesAsync(stoppingToken);
-
-            try
+            using (log.BeginScope(new Dictionary<string, object?>
             {
+                ["DocumentId"] = message.DocumentId,
+                ["TenantId"] = message.TenantId,
+                ["FileName"] = document.FileName
+            }))
+            {
+                document.Status = DocumentStatus.Processing;
+                await db.SaveChangesAsync(stoppingToken);
+                log.LogInformation("Document ingestion started");
+
+                try
+                {
                 var httpClient = httpClientFactory.CreateClient(nameof(SupabaseStorageService));
                 var baseUrl = (configuration["SUPABASE_URL"] ?? throw new InvalidOperationException("SUPABASE_URL is not configured.")).Trim();
                 var serviceKey = (configuration["SUPABASE_SERVICE_ROLE_KEY"] ?? throw new InvalidOperationException("SUPABASE_SERVICE_ROLE_KEY is not configured.")).Trim();
@@ -698,11 +736,14 @@ public class DocumentIngestionWorker : BackgroundService
 
                 document.Status = DocumentStatus.Ready;
                 await db.SaveChangesAsync(stoppingToken);
-            }
-            catch
-            {
-                document.Status = DocumentStatus.Failed;
-                await db.SaveChangesAsync(stoppingToken);
+                log.LogInformation("Document ingestion completed: Chunks={ChunkCount}", chunks.Count);
+                }
+                catch (Exception ex)
+                {
+                    document.Status = DocumentStatus.Failed;
+                    await db.SaveChangesAsync(stoppingToken);
+                    log.LogError(ex, "Document ingestion failed");
+                }
             }
         }
     }
