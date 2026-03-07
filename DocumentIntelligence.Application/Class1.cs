@@ -80,7 +80,7 @@ public interface IEmbeddingService
 
 public interface ILLMClient
 {
-    Task<string> GenerateAnswerAsync(string question, string context, CancellationToken cancellationToken);
+    Task<string> GenerateAnswerAsync(string question, string context, string? languageHint, CancellationToken cancellationToken);
 }
 
 public record DocumentIngestionMessage(Guid DocumentId, Guid TenantId);
@@ -148,7 +148,8 @@ public record AskQuestionCommand(
     Guid UserId,
     string Question,
     int TopK,
-    AskSearchMode Mode
+    AskSearchMode Mode,
+    string? LanguageHint
 ) : IRequest<AskResponse>;
 
 public record RetrievalChunkDto(Guid ChunkId, string Content, Guid DocumentId, string FileName);
@@ -516,7 +517,7 @@ public class AskQuestionCommandHandler : IRequestHandler<AskQuestionCommand, Ask
             ? string.Join("\n\n---\n\n", chunks.Select(c => $"[{c.FileName}]\n{c.Content}"))
             : "No relevant documents found.";
 
-        var answerText = await _llm.GenerateAnswerAsync(request.Question, contextText, cancellationToken);
+        var answerText = await _llm.GenerateAnswerAsync(request.Question, contextText, request.LanguageHint, cancellationToken);
         sw.Stop();
 
         var documentIds = chunks.Select(c => c.DocumentId).Distinct().ToList();

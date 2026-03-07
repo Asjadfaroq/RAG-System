@@ -460,14 +460,20 @@ public class HuggingFaceLLMClient : ILLMClient
     private static string SanitizeHfConfig(string value) =>
         string.IsNullOrEmpty(value) ? value : string.Concat(value.Trim().Where(c => !char.IsControl(c)));
 
-    public async Task<string> GenerateAnswerAsync(string question, string context, CancellationToken cancellationToken)
+    public async Task<string> GenerateAnswerAsync(string question, string context, string? languageHint, CancellationToken cancellationToken)
     {
         var apiKey = SanitizeHfConfig(_configuration["HUGGINGFACE_API_KEY"]
             ?? throw new InvalidOperationException("HUGGINGFACE_API_KEY not set."));
         var model = SanitizeHfConfig(_configuration["HUGGINGFACE_LLM_MODEL"]
             ?? throw new InvalidOperationException("HUGGINGFACE_LLM_MODEL not set."));
 
-        var prompt = $"Context:\n{context}\n\nQuestion:\n{question}\n\nAnswer:";
+        var languageInstruction = string.IsNullOrWhiteSpace(languageHint)
+            ? ""
+            : languageHint.Trim().Equals("ar", StringComparison.OrdinalIgnoreCase)
+                ? " Answer in Arabic only."
+                : " Answer in English only.";
+
+        var prompt = $"Context:\n{context}\n\nQuestion:\n{question}\n\nInstructions:{languageInstruction}\n\nAnswer:";
 
         var payload = new
         {

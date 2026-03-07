@@ -39,6 +39,7 @@ type ChatItem = {
   mode: "vector" | "hybrid";
   answer: string;
   sources: SourceDocument[];
+  answerLanguage?: AnswerLanguagePreference;
 };
 
 const quickQuestions = [
@@ -71,6 +72,24 @@ function formatError(status: number, body: unknown): string {
   return `Request failed with status ${status}.`;
 }
 
+/** Arabic script range (includes Arabic, Persian, Urdu, etc.). */
+const ARABIC_SCRIPT_REGEX = /[\u0600-\u06FF]/;
+
+function hasArabicScript(text: string): boolean {
+  return ARABIC_SCRIPT_REGEX.test(text);
+}
+
+type AnswerLanguagePreference = "auto" | "en" | "ar";
+
+function resolveAnswerDir(
+  preference: AnswerLanguagePreference,
+  answerText: string,
+): "ltr" | "rtl" {
+  if (preference === "ar") return "rtl";
+  if (preference === "en") return "ltr";
+  return hasArabicScript(answerText) ? "rtl" : "ltr";
+}
+
 export default function Home() {
   const [apiBase, setApiBase] = useState(
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224",
@@ -86,6 +105,7 @@ export default function Home() {
   const [language, setLanguage] = useState<string>("");
   const [topK, setTopK] = useState(5);
   const [mode, setMode] = useState<"vector" | "hybrid">("hybrid");
+  const [answerLanguage, setAnswerLanguage] = useState<AnswerLanguagePreference>("auto");
   const [question, setQuestion] = useState("");
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [chat, setChat] = useState<ChatItem[]>([]);
@@ -279,10 +299,18 @@ export default function Home() {
     setBusyAsk(true);
     setStatus("Running RAG query...");
     try {
+      const languageHint =
+        answerLanguage === "auto" ? undefined : answerLanguage === "ar" ? "ar" : "en";
+
       const res = await fetchWithAuth(`${apiBase}/workspaces/${workspaceId}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q.trim(), topK, mode }),
+        body: JSON.stringify({
+          question: q.trim(),
+          topK,
+          mode,
+          languageHint,
+        }),
       });
 
       const body = await readResponseBody(res);
@@ -306,6 +334,7 @@ export default function Home() {
           mode,
           answer: json.answer,
           sources: json.sources,
+          answerLanguage,
         },
         ...prev,
       ]);
@@ -465,6 +494,17 @@ export default function Home() {
             value={topK}
             onChange={(e) => setTopK(Number(e.target.value))}
           />
+          <label className="ml-2 text-sm">Answer in:</label>
+          <select
+            className="rounded border border-zinc-600 bg-transparent p-2"
+            value={answerLanguage}
+            onChange={(e) => setAnswerLanguage(e.target.value as AnswerLanguagePreference)}
+            title="Force answer language (Auto = follow question/content)"
+          >
+            <option value="auto">Auto</option>
+            <option value="en">English</option>
+            <option value="ar">Arabic</option>
+          </select>
         </div>
 
         <div className="mb-2 flex flex-wrap gap-2">
@@ -506,26 +546,33 @@ export default function Home() {
       <p className="text-sm text-zinc-400">{status}</p>
 
       <section className="space-y-3 pb-10">
-        {chat.map((item) => (
-          <article key={item.id} className="rounded border border-zinc-700 p-4">
-            <p className="text-sm text-zinc-400">
-              mode={item.mode}
-            </p>
-            <p className="font-medium">Q: {item.question}</p>
-            <p className="mt-2 whitespace-pre-wrap">A: {item.answer}</p>
-            <div className="mt-3">
-              <p className="mb-1 text-sm font-medium">Sources</p>
-              <ul className="space-y-1 text-sm text-zinc-300">
-                {item.sources.length === 0 && <li>No sources returned.</li>}
-                {item.sources.map((src) => (
-                  <li key={src.id} className="rounded bg-zinc-900 p-2">
-                    {src.fileName} - {src.id}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </article>
-        ))}
+        {chat.map((item) => {
+          const answerDir = resolveAnswerDir(item.answerLanguage ?? "auto", item.answer);
+          return (
+            <article
+              key={item.id}
+              className="rounded border border-zinc-700 p-4"
+              dir={answerDir}
+            >
+              <p className="text-sm text-zinc-400">mode={item.mode}</p>
+              <p className="font-medium">Q: {item.question}</p>
+              <p className="mt-2 whitespace-pre-wrap" dir={answerDir}>
+                A: {item.answer}
+              </p>
+              <div className="mt-3" dir="ltr">
+                <p className="mb-1 text-sm font-medium">Sources</p>
+                <ul className="space-y-1 text-sm text-zinc-300">
+                  {item.sources.length === 0 && <li>No sources returned.</li>}
+                  {item.sources.map((src) => (
+                    <li key={src.id} className="rounded bg-zinc-900 p-2">
+                      {src.fileName} - {src.id}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </article>
+          );
+        })}
       </section>
     </main>
   );

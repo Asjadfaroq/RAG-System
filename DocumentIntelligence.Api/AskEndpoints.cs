@@ -5,7 +5,7 @@ using MediatR;
 
 namespace DocumentIntelligence.Api;
 
-public record AskRequestDto(string Question, int TopK, string? Mode);
+public record AskRequestDto(string Question, int TopK, string? Mode, string? LanguageHint);
 
 public static class AskEndpoints
 {
@@ -36,13 +36,18 @@ public static class AskEndpoints
                 ? AskSearchMode.Hybrid
                 : AskSearchMode.Vector;
 
+            var languageHint = string.IsNullOrWhiteSpace(request.LanguageHint)
+                ? null
+                : request.LanguageHint!.Trim();
+
             var command = new AskQuestionCommand(
                 tenantId,
                 workspaceId,
                 userId,
                 request.Question,
                 topK,
-                mode);
+                mode,
+                languageHint);
 
             var result = await mediator.Send(command, ct);
             return Results.Ok(result);
