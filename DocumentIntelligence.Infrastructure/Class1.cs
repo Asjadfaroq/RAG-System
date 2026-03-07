@@ -650,6 +650,99 @@ public sealed class WorkspaceAccessService : IWorkspaceAccessService
     }
 }
 
+public sealed class TenantOverviewProvider : ITenantOverviewProvider
+{
+    private readonly ApplicationDbContext _db;
+
+    public TenantOverviewProvider(ApplicationDbContext db)
+    {
+        _db = db;
+    }
+
+    public async Task<TenantOverviewDto> GetOverviewAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var totalDocuments = await _db.Documents.CountAsync(d => d.TenantId == tenantId, cancellationToken);
+        var totalQuestions = await _db.Questions.CountAsync(q => q.TenantId == tenantId, cancellationToken);
+        var totalUsers = await _db.Users.CountAsync(u => u.TenantId == tenantId, cancellationToken);
+
+        var docCountPerWorkspace = await _db.Documents
+            .Where(d => d.TenantId == tenantId)
+            .GroupBy(d => new { d.WorkspaceId })
+            .Select(g => new { g.Key.WorkspaceId, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        var workspaceIds = docCountPerWorkspace.Select(x => x.WorkspaceId).Distinct().ToList();
+        var workspaceNames = await _db.Workspaces
+            .Where(w => workspaceIds.Contains(w.Id))
+            .ToDictionaryAsync(w => w.Id, w => w.Name, cancellationToken);
+
+        var docCountPerWorkspaceDtos = docCountPerWorkspace
+            .Select(x => new DocCountPerWorkspaceDto(x.WorkspaceId, workspaceNames.GetValueOrDefault(x.WorkspaceId, "?"), x.Count))
+            .ToList()
+            .AsReadOnly();
+
+        var thirtyDaysAgo = DateTime.UtcNow.Date.AddDays(-30);
+        var questionsInRange = await _db.Questions
+            .Where(q => q.TenantId == tenantId && q.CreatedAt >= thirtyDaysAgo)
+            .Select(q => q.CreatedAt)
+            .ToListAsync(cancellationToken);
+
+        var questionsByDay = questionsInRange
+            .GroupBy(d => d.Date)
+            .OrderBy(g => g.Key)
+            .Select(g => new QuestionsPerDayDto(g.Key, g.Count()))
+            .ToList()
+            .AsReadOnly();
+
+        var questionIds = await _db.Questions.Where(q => q.TenantId == tenantId).Select(q => q.Id).ToListAsync(cancellationToken);
+        var answers = await _db.Answers.Where(a => questionIds.Contains(a.QuestionId)).ToListAsync(cancellationToken);
+
+        double? averageLatencyMs = answers.Count > 0 ? answers.Average(a => a.LatencyMs) : null;
+
+        var documentUsageCounts = new Dictionary<Guid, int>();
+        foreach (var answer in answers)
+        {
+            if (string.IsNullOrEmpty(answer.SourcesJson)) continue;
+            try
+            {
+                var sources = System.Text.Json.JsonSerializer.Deserialize<List<SourceItem>>(answer.SourcesJson);
+                if (sources == null) continue;
+                foreach (var s in sources)
+                {
+                    documentUsageCounts.TryGetValue(s.DocumentId, out var c);
+                    documentUsageCounts[s.DocumentId] = c + 1;
+                }
+            }
+            catch { /* ignore parse errors */ }
+        }
+
+        var topDocIds = documentUsageCounts.OrderByDescending(kv => kv.Value).Take(10).Select(kv => kv.Key).ToList();
+        var docNames = await _db.Documents.Where(d => topDocIds.Contains(d.Id)).ToDictionaryAsync(d => d.Id, d => d.FileName, cancellationToken);
+
+        var topDocumentsByUsage = documentUsageCounts
+            .OrderByDescending(kv => kv.Value)
+            .Take(10)
+            .Select(kv => new TopDocumentUsageDto(kv.Key, docNames.GetValueOrDefault(kv.Key, "?"), kv.Value))
+            .ToList()
+            .AsReadOnly();
+
+        return new TenantOverviewDto(
+            totalDocuments,
+            totalQuestions,
+            totalUsers,
+            averageLatencyMs,
+            docCountPerWorkspaceDtos,
+            questionsByDay,
+            topDocumentsByUsage);
+    }
+
+    private sealed class SourceItem
+    {
+        public Guid DocumentId { get; set; }
+        public string? FileName { get; set; }
+    }
+}
+
 public class DocumentIngestionWorker : BackgroundService
 {
     private readonly IServiceProvider _serviceProvider;

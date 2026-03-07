@@ -103,6 +103,25 @@ public interface IWorkspaceAccessService
     Task<bool> WorkspaceBelongsToTenantAsync(Guid workspaceId, Guid tenantId, CancellationToken cancellationToken = default);
 }
 
+/// <summary>Admin tenant overview stats for the dashboard.</summary>
+public record TenantOverviewDto(
+    int TotalDocuments,
+    int TotalQuestions,
+    int TotalUsers,
+    double? AverageAnswerLatencyMs,
+    IReadOnlyList<DocCountPerWorkspaceDto> DocCountPerWorkspace,
+    IReadOnlyList<QuestionsPerDayDto> QuestionsPerDay,
+    IReadOnlyList<TopDocumentUsageDto> TopDocumentsByUsage);
+
+public record DocCountPerWorkspaceDto(Guid WorkspaceId, string WorkspaceName, int DocumentCount);
+public record QuestionsPerDayDto(DateTime Date, int Count);
+public record TopDocumentUsageDto(Guid DocumentId, string FileName, int UsageCount);
+
+public interface ITenantOverviewProvider
+{
+    Task<TenantOverviewDto> GetOverviewAsync(Guid tenantId, CancellationToken cancellationToken = default);
+}
+
 public interface IApplicationDbContext
 {
     IQueryable<Tenant> Tenants { get; }

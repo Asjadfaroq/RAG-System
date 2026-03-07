@@ -60,6 +60,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddMemoryCache();
 builder.Services.AddSingleton<ICacheService, InMemoryCacheService>();
 builder.Services.AddScoped<IWorkspaceAccessService, WorkspaceAccessService>();
+builder.Services.AddScoped<ITenantOverviewProvider, TenantOverviewProvider>();
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
@@ -137,5 +138,6 @@ app.MapAuth();
 app.MapWorkspaces();
 app.MapDocuments();
 app.MapAsk();
+app.MapAdmin();
 
 app.Run();

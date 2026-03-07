@@ -142,6 +142,21 @@ export default function Home() {
       setToken(newAccess);
       setRefreshToken(auth.refreshToken ?? "");
       setRole(auth.role ?? "");
+      try {
+        const stored = localStorage.getItem("di_auth");
+        const parsed = stored ? JSON.parse(stored) : {};
+        localStorage.setItem(
+          "di_auth",
+          JSON.stringify({
+            ...parsed,
+            token: newAccess,
+            refreshToken: auth.refreshToken ?? parsed.refreshToken,
+            role: auth.role ?? parsed.role,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
       return newAccess;
     } catch {
       return null;
@@ -200,6 +215,20 @@ export default function Home() {
       setToken(jwt);
       setRefreshToken(login.refreshToken ?? "");
       setRole(login.role ?? "");
+      try {
+        localStorage.setItem(
+          "di_auth",
+          JSON.stringify({
+            apiBase,
+            token: jwt,
+            refreshToken: login.refreshToken ?? "",
+            role: login.role ?? "",
+            email: login.email ?? email,
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
       await loadWorkspaces(jwt);
       setStatus("Login successful. Workspace loaded.");
     } catch (err) {
@@ -350,7 +379,17 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Document Intelligence Q&A</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold">Document Intelligence Q&A</h1>
+        {canCreateWorkspace && (
+          <a
+            href="/admin"
+            className="rounded border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700"
+          >
+            Admin Dashboard
+          </a>
+        )}
+      </div>
 
       <section className="grid gap-3 rounded border border-zinc-700 p-4 md:grid-cols-3">
         <input
