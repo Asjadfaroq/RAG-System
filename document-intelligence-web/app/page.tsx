@@ -1,13 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-
-const AUTH_KEY = "di_auth";
-
-type StoredPrefill = { apiBase?: string; tenantSlug?: string };
-
-/** Auth response (tokens are in HttpOnly cookies). */
-type AuthResponse = { tenantId: string; email: string; role: string };
+import { useRouter } from "next/navigation";
+import { readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "./lib/api";
 
 type Workspace = {
   id: string;
@@ -47,26 +42,6 @@ const quickQuestions = [
   "Summarize experience in 5 bullet points.",
 ];
 
-async function readResponseBody(res: Response): Promise<unknown | null> {
-  const raw = await res.text();
-  if (!raw) return null;
-  try {
-    return JSON.parse(raw) as unknown;
-  } catch {
-    return raw;
-  }
-}
-
-function formatError(status: number, body: unknown): string {
-  if (typeof body === "string" && body.trim().length > 0) {
-    return body;
-  }
-  if (body && typeof body === "object") {
-    return JSON.stringify(body);
-  }
-  return `Request failed with status ${status}.`;
-}
-
 /** Arabic script range (includes Arabic, Persian, Urdu, etc.). */
 const ARABIC_SCRIPT_REGEX = /[\u0600-\u06FF]/;
 
@@ -86,12 +61,12 @@ function resolveAnswerDir(
 }
 
 export default function Home() {
+  const router = useRouter();
   const [apiBase, setApiBase] = useState(
     process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224",
   );
   const [tenantSlug, setTenantSlug] = useState("acme");
-  const [email, setEmail] = useState("owner@acme.com");
-  const [password, setPassword] = useState("Password123!");
+  const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceId, setWorkspaceId] = useState("");
@@ -103,7 +78,7 @@ export default function Home() {
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [chat, setChat] = useState<ChatItem[]>([]);
   const [status, setStatus] = useState<string>("");
-  const [busyLogin, setBusyLogin] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
   const [busyAsk, setBusyAsk] = useState(false);
   const [busyCreateWorkspace, setBusyCreateWorkspace] = useState(false);
@@ -123,7 +98,7 @@ export default function Home() {
     setRole(a.role ?? "");
   }
 
-  // Restore apiBase/tenantSlug from localStorage (form prefill) and session from cookies via /auth/me
+  // Restore apiBase/tenantSlug, check session; if not logged in, redirect to sign in
   useEffect(() => {
     if (typeof window === "undefined") return;
     let base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
@@ -140,7 +115,12 @@ export default function Home() {
     fetch(`${base}/auth/me`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: AuthResponse | null) => {
-        if (cancelled || !data) return;
+        if (cancelled) return;
+        setAuthChecked(true);
+        if (!data) {
+          router.replace("/signin");
+          return;
+        }
         setUserFromAuth(data);
         return fetch(`${base}/workspaces`, { credentials: "include" });
       })
@@ -152,9 +132,9 @@ export default function Home() {
           if (data.length > 0) setWorkspaceId((prev) => prev || data[0].id);
         }
       })
-      .catch(() => { /* ignore */ });
+      .catch(() => { setAuthChecked(true); router.replace("/signin"); });
     return () => { cancelled = true; };
-  }, []);
+  }, [router]);
 
   async function refreshSession(): Promise<boolean> {
     try {
@@ -198,39 +178,6 @@ export default function Home() {
     if (data.length > 0) setWorkspaceId((prev) => prev || data[0].id);
   }
 
-  async function handleLogin(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setBusyLogin(true);
-    setStatus("Logging in...");
-    try {
-      const res = await fetch(`${apiBase}/auth/login`, {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tenantSlug: tenantSlug.trim(),
-          email: email.trim(),
-          password,
-        }),
-      });
-      const body = await readResponseBody(res);
-      if (!res.ok) throw new Error(formatError(res.status, body));
-      if (!body || typeof body !== "object" || !("role" in body))
-        throw new Error("Unexpected login response.");
-      const auth = body as AuthResponse;
-      setUserFromAuth(auth);
-      try {
-        localStorage.setItem(AUTH_KEY, JSON.stringify({ apiBase, tenantSlug: tenantSlug.trim() } as StoredPrefill));
-      } catch { /* ignore */ }
-      await loadWorkspaces();
-      setStatus("Login successful. Workspace loaded.");
-    } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Login failed.");
-    } finally {
-      setBusyLogin(false);
-    }
-  }
-
   async function handleLogout() {
     try {
       await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "include" });
@@ -238,8 +185,8 @@ export default function Home() {
     setRole("");
     setWorkspaces([]);
     setWorkspaceId("");
-    // Keep email, tenantSlug, password so "Login" again works without re-typing
     setStatus("Logged out.");
+    router.replace("/signin");
   }
 
   async function handleCreateWorkspace(e: FormEvent<HTMLFormElement>) {
@@ -381,6 +328,14 @@ export default function Home() {
     }
   }
 
+  if (!authChecked || !isLoggedIn) {
+    return (
+      <main className="flex min-h-screen items-center justify-center p-6">
+        <p className="text-zinc-400">Loading...</p>
+      </main>
+    );
+  }
+
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -429,50 +384,23 @@ export default function Home() {
         </button>
       </section>
 
-      <section className="rounded border border-zinc-700 p-4">
-        <h2 className="mb-2 text-lg font-medium">Login</h2>
-        <form className="grid gap-3 md:grid-cols-4" onSubmit={handleLogin}>
-          <input
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-          <input
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            type="password"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <select
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            disabled={!isLoggedIn || workspaces.length === 0}
-          >
-            <option value="">
-              {isLoggedIn ? "Select workspace" : "Login to load workspaces"}
+      <section className="grid gap-3 rounded border border-zinc-700 p-4 md:grid-cols-2">
+        <p className="text-sm text-zinc-400">
+          Logged in as {email} ({role})
+        </p>
+        <select
+          className="rounded border border-zinc-600 bg-transparent p-2"
+          value={workspaceId}
+          onChange={(e) => setWorkspaceId(e.target.value)}
+          disabled={workspaces.length === 0}
+        >
+          <option value="">Select workspace</option>
+          {workspaces.map((w) => (
+            <option key={w.id} value={w.id}>
+              {w.name} ({w.id.slice(0, 8)}...)
             </option>
-            {workspaces.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.id.slice(0, 8)}...)
-              </option>
-            ))}
-          </select>
-          <button
-            className="rounded bg-blue-600 p-2 font-medium text-white disabled:opacity-60"
-            type="submit"
-            disabled={busyLogin}
-          >
-            {busyLogin ? "Logging in..." : "Login"}
-          </button>
-        </form>
-        {isLoggedIn && (
-          <p className="mt-2 text-xs text-zinc-400">
-            Logged in as {email} ({role}). Session in secure cookies.
-          </p>
-        )}
+          ))}
+        </select>
       </section>
 
       {canCreateWorkspace && (
