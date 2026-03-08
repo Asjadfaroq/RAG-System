@@ -1,3 +1,9 @@
+/** API base URL from env. Set NEXT_PUBLIC_API_BASE_URL in .env.local (e.g. http://localhost:5224). */
+export function getApiBase(): string {
+  const url = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
+  return url.trim();
+}
+
 export async function readResponseBody(res: Response): Promise<unknown | null> {
   const raw = await res.text();
   if (!raw) return null;
@@ -15,5 +21,5 @@ export function formatError(status: number, body: unknown): string {
 }
 
 export const AUTH_KEY = "di_auth";
-export type StoredPrefill = { apiBase?: string; tenantSlug?: string };
+export type StoredPrefill = { tenantSlug?: string };
 export type AuthResponse = { tenantId: string; email: string; role: string };

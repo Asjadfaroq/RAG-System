@@ -2,6 +2,8 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+The app reads `NEXT_PUBLIC_API_BASE_URL` from the repo root `.env` (e.g. `http://localhost:5224`). The dev/build scripts load it automatically.
+
 First, run the development server:
 
 ```bash

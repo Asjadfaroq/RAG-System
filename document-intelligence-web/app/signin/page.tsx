@@ -3,13 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "../lib/api";
+import { getApiBase, readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "../lib/api";
 
 export default function SignInPage() {
   const router = useRouter();
-  const [apiBase, setApiBase] = useState(
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224",
-  );
   const [tenantSlug, setTenantSlug] = useState("acme");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -18,16 +15,14 @@ export default function SignInPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
     try {
       const raw = localStorage.getItem(AUTH_KEY);
       if (raw) {
         const prefill = JSON.parse(raw) as StoredPrefill;
-        if (prefill.apiBase) { base = prefill.apiBase; setApiBase(prefill.apiBase); }
         if (prefill.tenantSlug) setTenantSlug(prefill.tenantSlug);
       }
     } catch { /* ignore */ }
-    fetch(`${base.trim()}/auth/me`, { credentials: "include" })
+    fetch(`${getApiBase()}/auth/me`, { credentials: "include" })
       .then((res) => res.ok ? res.json() : null)
       .then((data: AuthResponse | null) => {
         if (data) router.replace("/");
@@ -40,7 +35,7 @@ export default function SignInPage() {
     setBusy(true);
     setStatus("Signing in...");
     try {
-      const res = await fetch(`${apiBase}/auth/login`, {
+      const res = await fetch(`${getApiBase()}/auth/login`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -56,7 +51,7 @@ export default function SignInPage() {
         throw new Error("Unexpected response.");
       const auth = body as AuthResponse;
       try {
-        localStorage.setItem(AUTH_KEY, JSON.stringify({ apiBase, tenantSlug: tenantSlug.trim() } as StoredPrefill));
+        localStorage.setItem(AUTH_KEY, JSON.stringify({ tenantSlug: tenantSlug.trim() } as StoredPrefill));
       } catch { /* ignore */ }
       setStatus("Success. Redirecting...");
       router.replace("/");
@@ -73,15 +68,10 @@ export default function SignInPage() {
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <input
           className="rounded border border-zinc-600 bg-transparent p-2"
-          placeholder="API base (e.g. http://localhost:5224)"
-          value={apiBase}
-          onChange={(e) => setApiBase(e.target.value)}
-        />
-        <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
-          placeholder="Tenant slug"
+          placeholder="Tenant slug (e.g. acme)"
           value={tenantSlug}
           onChange={(e) => setTenantSlug(e.target.value)}
+          required
         />
         <input
           className="rounded border border-zinc-600 bg-transparent p-2"

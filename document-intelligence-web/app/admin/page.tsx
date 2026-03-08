@@ -13,10 +13,8 @@ import {
   LineChart,
   Line,
 } from "recharts";
+import { getApiBase } from "../lib/api";
 
-const AUTH_KEY = "di_auth";
-
-type StoredPrefill = { apiBase?: string; tenantSlug?: string };
 type AuthMe = { tenantId: string; email: string; role: string };
 
 type DocCountPerWorkspace = { workspaceId: string; workspaceName: string; documentCount: number };
@@ -44,17 +42,6 @@ type TenantOverview = {
   questionsPerDay?: (QuestionsPerDay & { Date?: string; Count?: number })[];
   topDocumentsByUsage?: TopDocumentUsage[];
 };
-
-function getApiBase(): string {
-  if (typeof window === "undefined") return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    const prefill = raw ? (JSON.parse(raw) as StoredPrefill) : null;
-    return (prefill?.apiBase ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224").trim();
-  } catch {
-    return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
-  }
-}
 
 export default function AdminPage() {
   const [overview, setOverview] = useState<TenantOverview | null>(null);

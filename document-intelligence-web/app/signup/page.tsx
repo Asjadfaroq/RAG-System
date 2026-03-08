@@ -3,13 +3,10 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "../lib/api";
+import { getApiBase, readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "../lib/api";
 
 export default function SignUpPage() {
   const router = useRouter();
-  const [apiBase, setApiBase] = useState(
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224",
-  );
   const [tenantName, setTenantName] = useState("");
   const [tenantSlug, setTenantSlug] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
@@ -23,7 +20,6 @@ export default function SignUpPage() {
       const raw = localStorage.getItem(AUTH_KEY);
       if (raw) {
         const prefill = JSON.parse(raw) as StoredPrefill;
-        if (prefill.apiBase) setApiBase(prefill.apiBase);
         if (prefill.tenantSlug) setTenantSlug(prefill.tenantSlug);
       }
     } catch { /* ignore */ }
@@ -34,7 +30,7 @@ export default function SignUpPage() {
     setBusy(true);
     setStatus("Creating account...");
     try {
-      const res = await fetch(`${apiBase}/auth/register-tenant`, {
+      const res = await fetch(`${getApiBase()}/auth/register-tenant`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -51,7 +47,7 @@ export default function SignUpPage() {
         throw new Error("Unexpected response.");
       const auth = body as AuthResponse;
       try {
-        localStorage.setItem(AUTH_KEY, JSON.stringify({ apiBase, tenantSlug: tenantSlug.trim() } as StoredPrefill));
+        localStorage.setItem(AUTH_KEY, JSON.stringify({ tenantSlug: tenantSlug.trim() } as StoredPrefill));
       } catch { /* ignore */ }
       setStatus("Account created. Redirecting...");
       router.replace("/");
@@ -66,12 +62,6 @@ export default function SignUpPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 p-6">
       <h1 className="text-2xl font-semibold">Create Account</h1>
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-        <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
-          placeholder="API base (e.g. http://localhost:5224)"
-          value={apiBase}
-          onChange={(e) => setApiBase(e.target.value)}
-        />
         <input
           className="rounded border border-zinc-600 bg-transparent p-2"
           placeholder="Tenant name"

@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "./lib/api";
+import { getApiBase, readResponseBody, formatError, AUTH_KEY, StoredPrefill, AuthResponse } from "./lib/api";
 
 type Workspace = {
   id: string;
@@ -62,10 +62,6 @@ function resolveAnswerDir(
 
 export default function Home() {
   const router = useRouter();
-  const [apiBase, setApiBase] = useState(
-    process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224",
-  );
-  const [tenantSlug, setTenantSlug] = useState("acme");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -87,8 +83,8 @@ export default function Home() {
   const isLoggedIn = Boolean(role);
 
   const canCallApi = useMemo(
-    () => Boolean(apiBase.trim() && isLoggedIn && workspaceId.trim()),
-    [apiBase, isLoggedIn, workspaceId],
+    () => Boolean(getApiBase().trim() && isLoggedIn && workspaceId.trim()),
+    [isLoggedIn, workspaceId],
   );
 
   const canCreateWorkspace = role === "Owner" || role === "Admin";
@@ -98,21 +94,11 @@ export default function Home() {
     setRole(a.role ?? "");
   }
 
-  // Restore apiBase/tenantSlug, check session; if not logged in, redirect to sign in
+  // Check session; if not logged in, redirect to sign in
   useEffect(() => {
     if (typeof window === "undefined") return;
-    let base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:5224";
-    try {
-      const raw = localStorage.getItem(AUTH_KEY);
-      if (raw) {
-        const prefill = JSON.parse(raw) as StoredPrefill;
-        if (prefill.apiBase) { base = prefill.apiBase; setApiBase(prefill.apiBase); }
-        if (prefill.tenantSlug) setTenantSlug(prefill.tenantSlug);
-      }
-    } catch { /* ignore */ }
     let cancelled = false;
-    base = base.trim() || base;
-    fetch(`${base}/auth/me`, { credentials: "include" })
+    fetch(`${getApiBase()}/auth/me`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((data: AuthResponse | null) => {
         if (cancelled) return;
@@ -122,7 +108,7 @@ export default function Home() {
           return;
         }
         setUserFromAuth(data);
-        return fetch(`${base}/workspaces`, { credentials: "include" });
+        return fetch(`${getApiBase()}/workspaces`, { credentials: "include" });
       })
       .then((res) => (res?.ok ? res.json() : null))
       .then((data: Workspace[] | null) => {
@@ -132,13 +118,16 @@ export default function Home() {
           if (data.length > 0) setWorkspaceId((prev) => prev || data[0].id);
         }
       })
-      .catch(() => { setAuthChecked(true); router.replace("/signin"); });
+      .catch(() => {
+        setAuthChecked(true);
+        router.replace("/signin");
+      });
     return () => { cancelled = true; };
   }, [router]);
 
   async function refreshSession(): Promise<boolean> {
     try {
-      const res = await fetch(`${apiBase}/auth/refresh`, {
+      const res = await fetch(`${getApiBase()}/auth/refresh`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -163,10 +152,10 @@ export default function Home() {
   }
 
   async function loadWorkspaces() {
-    let res = await fetch(`${apiBase}/workspaces`, { credentials: "include" });
+    let res = await fetch(`${getApiBase()}/workspaces`, { credentials: "include" });
     if (res.status === 401) {
       const ok = await refreshSession();
-      if (ok) res = await fetch(`${apiBase}/workspaces`, { credentials: "include" });
+      if (ok) res = await fetch(`${getApiBase()}/workspaces`, { credentials: "include" });
     }
     const body = await readResponseBody(res);
     if (!res.ok) {
@@ -180,7 +169,7 @@ export default function Home() {
 
   async function handleLogout() {
     try {
-      await fetch(`${apiBase}/auth/logout`, { method: "POST", credentials: "include" });
+      await fetch(`${getApiBase()}/auth/logout`, { method: "POST", credentials: "include" });
     } catch { /* ignore */ }
     setRole("");
     setWorkspaces([]);
@@ -198,7 +187,7 @@ export default function Home() {
     setBusyCreateWorkspace(true);
     setStatus("Creating workspace...");
     try {
-      const res = await fetchWithAuth(`${apiBase}/workspaces`, {
+      const res = await fetchWithAuth(`${getApiBase()}/workspaces`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newWorkspaceName.trim(), description: newWorkspaceDescription.trim() || null }),
@@ -249,7 +238,7 @@ export default function Home() {
       const query = new URLSearchParams({ workspaceId: workspaceId.trim() });
       if (language.trim()) query.set("language", language.trim());
 
-      const res = await fetchWithAuth(`${apiBase}/documents/upload?${query.toString()}`, {
+      const res = await fetchWithAuth(`${getApiBase()}/documents/upload?${query.toString()}`, {
         method: "POST",
         headers: {},
         body: form,
@@ -283,7 +272,7 @@ export default function Home() {
       const languageHint =
         answerLanguage === "auto" ? undefined : answerLanguage === "ar" ? "ar" : "en";
 
-      const res = await fetchWithAuth(`${apiBase}/workspaces/${workspaceId}/ask`, {
+      const res = await fetchWithAuth(`${getApiBase()}/workspaces/${workspaceId}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -361,46 +350,32 @@ export default function Home() {
         </div>
       </div>
 
-      <section className="grid gap-3 rounded border border-zinc-700 p-4 md:grid-cols-3">
-        <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
-          placeholder="API base (http://localhost:5224)"
-          value={apiBase}
-          onChange={(e) => setApiBase(e.target.value)}
-        />
-        <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
-          placeholder="Tenant slug"
-          value={tenantSlug}
-          onChange={(e) => setTenantSlug(e.target.value)}
-        />
-        <button
-          type="button"
-          className="rounded border border-zinc-600 p-2 text-sm hover:bg-zinc-800"
-          onClick={handleRefreshWorkspaces}
-          disabled={!isLoggedIn}
-        >
-          Refresh Workspaces
-        </button>
-      </section>
-
       <section className="grid gap-3 rounded border border-zinc-700 p-4 md:grid-cols-2">
         <p className="text-sm text-zinc-400">
           Logged in as {email} ({role})
         </p>
-        <select
-          className="rounded border border-zinc-600 bg-transparent p-2"
-          value={workspaceId}
-          onChange={(e) => setWorkspaceId(e.target.value)}
-          disabled={workspaces.length === 0}
-        >
-          <option value="">Select workspace</option>
-          {workspaces.map((w) => (
-            <option key={w.id} value={w.id}>
-              {w.name} ({w.id.slice(0, 8)}...)
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="rounded border border-zinc-600 bg-transparent p-2"
+            value={workspaceId}
+            onChange={(e) => setWorkspaceId(e.target.value)}
+            disabled={workspaces.length === 0}
+          >
+            <option value="">Select workspace</option>
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name} ({w.id.slice(0, 8)}...)
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="rounded border border-zinc-600 p-2 text-sm hover:bg-zinc-800"
+            onClick={handleRefreshWorkspaces}
+          >
+            Refresh Workspaces
+          </button>
+        </div>
       </section>
 
       {canCreateWorkspace && (
