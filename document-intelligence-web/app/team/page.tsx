@@ -20,7 +20,6 @@ export default function TeamPage() {
   const [latestCode, setLatestCode] = useState<string | null>(null);
   const [joinCode, setJoinCode] = useState("");
   const [joinPassword, setJoinPassword] = useState("");
-  const [joinConfirmPassword, setJoinConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -92,10 +91,6 @@ export default function TeamPage() {
       setStatus("Invite code is required.");
       return;
     }
-    if (joinPassword !== joinConfirmPassword) {
-      setStatus("Join passwords do not match.");
-      return;
-    }
     setBusy(true);
     setStatus("Joining tenant with invite code...");
     try {
@@ -116,7 +111,6 @@ export default function TeamPage() {
       setStatus("Joined tenant successfully. You can now switch tenants from the sidebar.");
       setJoinCode("");
       setJoinPassword("");
-      setJoinConfirmPassword("");
       await loadMembers();
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Failed to join tenant.");
@@ -212,14 +206,6 @@ export default function TeamPage() {
             placeholder="Password"
             value={joinPassword}
             onChange={(e) => setJoinPassword(e.target.value)}
-            required
-          />
-          <input
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            type="password"
-            placeholder="Confirm password"
-            value={joinConfirmPassword}
-            onChange={(e) => setJoinConfirmPassword(e.target.value)}
             required
           />
           <button
