@@ -18,6 +18,9 @@ export default function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState<"Member" | "Admin">("Member");
   const [latestCode, setLatestCode] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState("");
+  const [joinPassword, setJoinPassword] = useState("");
+  const [joinConfirmPassword, setJoinConfirmPassword] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -78,6 +81,45 @@ export default function TeamPage() {
       await loadMembers();
     } catch (err) {
       setStatus(err instanceof Error ? err.message : "Failed to create invite.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleJoinTenant(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!joinCode.trim()) {
+      setStatus("Invite code is required.");
+      return;
+    }
+    if (joinPassword !== joinConfirmPassword) {
+      setStatus("Join passwords do not match.");
+      return;
+    }
+    setBusy(true);
+    setStatus("Joining tenant with invite code...");
+    try {
+      const res = await fetch(`${getApiBase()}/auth/accept-invite`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: joinCode.trim(),
+          password: joinPassword,
+        }),
+      });
+      const body = await readResponseBody(res);
+      if (!res.ok) throw new Error(formatError(res.status, body));
+      if (!body || typeof body !== "object" || !("role" in body)) {
+        throw new Error("Unexpected response from accept-invite endpoint.");
+      }
+      setStatus("Joined tenant successfully. You can now switch tenants from the sidebar.");
+      setJoinCode("");
+      setJoinPassword("");
+      setJoinConfirmPassword("");
+      await loadMembers();
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : "Failed to join tenant.");
     } finally {
       setBusy(false);
     }
@@ -152,6 +194,42 @@ export default function TeamPage() {
             <span className="font-mono rounded bg-zinc-900 px-2 py-1">{latestCode}</span>
           </p>
         )}
+      </section>
+
+      <section className="rounded border border-zinc-700 p-4">
+        <h2 className="mb-2 text-lg font-medium">Join Another Tenant</h2>
+        <form className="flex flex-col gap-3 md:flex-row" onSubmit={handleJoinTenant}>
+          <input
+            className="flex-1 rounded border border-zinc-600 bg-transparent p-2"
+            placeholder="Invite code"
+            value={joinCode}
+            onChange={(e) => setJoinCode(e.target.value)}
+            required
+          />
+          <input
+            className="rounded border border-zinc-600 bg-transparent p-2"
+            type="password"
+            placeholder="Password"
+            value={joinPassword}
+            onChange={(e) => setJoinPassword(e.target.value)}
+            required
+          />
+          <input
+            className="rounded border border-zinc-600 bg-transparent p-2"
+            type="password"
+            placeholder="Confirm password"
+            value={joinConfirmPassword}
+            onChange={(e) => setJoinConfirmPassword(e.target.value)}
+            required
+          />
+          <button
+            className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+            type="submit"
+            disabled={busy}
+          >
+            {busy ? "Joining..." : "Join Tenant"}
+          </button>
+        </form>
       </section>
 
       <p className="text-sm text-zinc-400">{status}</p>
