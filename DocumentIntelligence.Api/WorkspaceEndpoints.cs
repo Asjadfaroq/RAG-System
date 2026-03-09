@@ -36,6 +36,26 @@ public static class WorkspaceEndpoints
         })
         .RequireAuthorization("OwnerOrAdmin");
 
+        group.MapDelete("/{workspaceId:guid}", async (
+            Guid workspaceId,
+            ClaimsPrincipal user,
+            IWorkspaceDeleteService deleteService,
+            bool confirm,
+            CancellationToken ct) =>
+        {
+            if (user.GetRole() != "Owner") return Results.Forbid();
+            var tenantId = user.GetTenantId();
+            if (tenantId == null) return Results.Unauthorized();
+            if (!confirm) return Results.BadRequest(new { error = "Confirmation required. Set confirm=true to proceed." });
+            try
+            {
+                await deleteService.DeleteWorkspaceAsync(workspaceId, tenantId.Value, ct);
+                return Results.NoContent();
+            }
+            catch (InvalidOperationException ex) { return Results.NotFound(new { error = ex.Message }); }
+        })
+        .RequireAuthorization("OwnerOnly");
+
         return routes;
     }
 }

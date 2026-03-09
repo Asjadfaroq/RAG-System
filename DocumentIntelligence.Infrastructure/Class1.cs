@@ -483,6 +483,29 @@ public class SupabaseStorageService : IStorageService
 
         return $"{bucket}/{objectPath}";
     }
+
+    public async Task DeleteObjectAsync(string storagePath, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(storagePath)) return;
+        var firstSlash = storagePath.IndexOf('/');
+        if (firstSlash <= 0 || firstSlash == storagePath.Length - 1) return;
+        var bucket = storagePath[..firstSlash];
+        var objectPath = storagePath[(firstSlash + 1)..];
+        var baseUrl = (_configuration["SUPABASE_URL"] ?? throw new InvalidOperationException("SUPABASE_URL is not configured.")).Trim();
+        var serviceKey = (_configuration["SUPABASE_SERVICE_ROLE_KEY"] ?? throw new InvalidOperationException("SUPABASE_SERVICE_ROLE_KEY is not configured.")).Trim();
+        var baseUri = new Uri(baseUrl, UriKind.Absolute);
+        var deleteUri = new Uri(baseUri, $"/storage/v1/object/{bucket}/{objectPath}");
+        using var request = new HttpRequestMessage(HttpMethod.Delete, deleteUri);
+        request.Headers.Add("apikey", (_configuration["SUPABASE_ANON_KEY"] ?? "").Trim());
+        request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", serviceKey);
+        var response = await _httpClient.SendAsync(request, cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return;
+        if (!response.IsSuccessStatusCode)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            throw new InvalidOperationException($"Failed to delete from Supabase Storage. Status: {response.StatusCode}, Body: {body}");
+        }
+    }
 }
 
 public class HuggingFaceEmbeddingService : IEmbeddingService
@@ -821,6 +844,95 @@ public sealed class WorkspaceAccessService : IWorkspaceAccessService
     public async Task<bool> WorkspaceBelongsToTenantAsync(Guid workspaceId, Guid tenantId, CancellationToken cancellationToken = default)
     {
         return await _db.Workspaces.AnyAsync(w => w.Id == workspaceId && w.TenantId == tenantId, cancellationToken);
+    }
+}
+
+public sealed class WorkspaceDeleteService : IWorkspaceDeleteService
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IStorageService _storage;
+    private readonly ILogger<WorkspaceDeleteService> _logger;
+
+    public WorkspaceDeleteService(ApplicationDbContext db, IStorageService storage, ILogger<WorkspaceDeleteService> logger)
+    {
+        _db = db;
+        _storage = storage;
+        _logger = logger;
+    }
+
+    public async Task DeleteWorkspaceAsync(Guid workspaceId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var workspace = await _db.Workspaces.FirstOrDefaultAsync(w => w.Id == workspaceId && w.TenantId == tenantId, cancellationToken);
+        if (workspace == null) throw new InvalidOperationException("Workspace not found or access denied.");
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            var documents = await _db.Documents.Where(d => d.WorkspaceId == workspaceId).ToListAsync(cancellationToken);
+            foreach (var doc in documents)
+            {
+                try
+                {
+                    await _storage.DeleteObjectAsync(doc.StoragePath, cancellationToken);
+                    _logger.LogInformation("Deleted storage file for document {DocumentId}", doc.Id);
+                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete storage file {StoragePath}", doc.StoragePath); }
+            }
+            var questions = await _db.Questions.Where(q => q.WorkspaceId == workspaceId).ToListAsync(cancellationToken);
+            _db.Answers.RemoveRange(_db.Answers.Where(a => questions.Select(q => q.Id).Contains(a.QuestionId)));
+            _db.Questions.RemoveRange(questions);
+            _db.Documents.RemoveRange(documents);
+            _db.Workspaces.Remove(workspace);
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogInformation("Deleted workspace {WorkspaceId} for tenant {TenantId}", workspaceId, tenantId);
+        }
+        catch { await transaction.RollbackAsync(cancellationToken); throw; }
+    }
+}
+
+public sealed class TenantDeleteService : ITenantDeleteService
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IStorageService _storage;
+    private readonly ILogger<TenantDeleteService> _logger;
+
+    public TenantDeleteService(ApplicationDbContext db, IStorageService storage, ILogger<TenantDeleteService> logger)
+    {
+        _db = db;
+        _storage = storage;
+        _logger = logger;
+    }
+
+    public async Task DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var tenant = await _db.Tenants.FirstOrDefaultAsync(t => t.Id == tenantId, cancellationToken);
+        if (tenant == null) throw new InvalidOperationException("Tenant not found.");
+
+        var documents = await _db.Documents.Where(d => d.TenantId == tenantId).ToListAsync(cancellationToken);
+        var workspaceIds = (await _db.Workspaces.Where(w => w.TenantId == tenantId).Select(w => w.Id).ToListAsync(cancellationToken)).ToHashSet();
+
+        await using var transaction = await _db.Database.BeginTransactionAsync(cancellationToken);
+        try
+        {
+            foreach (var doc in documents)
+            {
+                try { await _storage.DeleteObjectAsync(doc.StoragePath, cancellationToken); }
+                catch (Exception ex) { _logger.LogWarning(ex, "Failed to delete storage file {StoragePath}", doc.StoragePath); }
+            }
+            var questions = await _db.Questions.Where(q => workspaceIds.Contains(q.WorkspaceId)).ToListAsync(cancellationToken);
+            _db.Answers.RemoveRange(_db.Answers.Where(a => questions.Select(q => q.Id).Contains(a.QuestionId)));
+            _db.Questions.RemoveRange(questions);
+            _db.Documents.RemoveRange(documents);
+            _db.Workspaces.RemoveRange(_db.Workspaces.Where(w => w.TenantId == tenantId));
+            _db.TenantInvites.RemoveRange(_db.TenantInvites.Where(i => i.TenantId == tenantId));
+            _db.Users.RemoveRange(_db.Users.Where(u => u.TenantId == tenantId));
+            _db.Tenants.Remove(tenant);
+            await _db.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            _logger.LogInformation("Deleted tenant {TenantId}", tenantId);
+        }
+        catch { await transaction.RollbackAsync(cancellationToken); throw; }
     }
 }
 

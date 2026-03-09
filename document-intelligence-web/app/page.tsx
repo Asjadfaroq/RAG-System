@@ -181,7 +181,11 @@ export default function Home() {
     }
     const data = Array.isArray(body) ? (body as Workspace[]) : [];
     setWorkspaces(data);
-    if (data.length > 0) setWorkspaceId((prev) => prev || data[0].id);
+    if (data.length > 0) {
+      setWorkspaceId((prev) => prev || data[0].id);
+    } else {
+      setWorkspaceId("");
+    }
   }
 
   async function loadTenants(initialTenantId?: string) {
@@ -234,6 +238,7 @@ export default function Home() {
       const auth = body as AuthResponse;
       setUserFromAuth(auth);
       setActiveTenantId(auth.tenantId);
+      setChat([]);
       await loadWorkspaces();
       setStatus("Tenant switched.");
       showToast("Tenant switched.", "success");
@@ -637,8 +642,30 @@ export default function Home() {
 
             {/* Chat area */}
             <div className="flex min-h-0 flex-1 flex-col p-3">
-              {/* Empty state: centered input (ChatGPT-style) */}
-              {chat.length === 0 && (
+              {/* No workspaces: prompt to create one */}
+              {workspaces.length === 0 && (
+                <div className="flex flex-1 flex-col items-center justify-center px-4">
+                  <p className="mb-2 text-center text-[17px] font-medium tracking-tight text-zinc-300">
+                    {locale === "ar" ? "لا توجد مساحات عمل" : "No workspaces yet"}
+                  </p>
+                  <p className="mb-6 text-center text-sm text-zinc-500">
+                    {locale === "ar"
+                      ? "أنشئ مساحة عمل من القائمة الجانبية لبدء تحميل المستندات وطرح الأسئلة."
+                      : "Create a workspace from the sidebar to start uploading documents and asking questions."}
+                  </p>
+                  {canCreateWorkspace && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateWorkspaceModal(true)}
+                      className="rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-5 py-2.5 text-sm font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30"
+                    >
+                      {locale === "ar" ? "أنشئ مساحة عمل" : "Create workspace"}
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* Empty state: centered input (ChatGPT-style) — when we have workspaces */}
+              {workspaces.length > 0 && chat.length === 0 && (
                 <div className="flex flex-1 flex-col items-center justify-center px-4">
                   <p className="mb-8 text-center text-[17px] font-medium tracking-tight text-zinc-300">
                     {locale === "ar"

@@ -24,6 +24,25 @@ public static class AdminEndpoints
             return Results.Ok(overview);
         });
 
+        group.MapDelete("/tenant", async (
+            ClaimsPrincipal user,
+            ITenantDeleteService deleteService,
+            bool confirm,
+            CancellationToken ct) =>
+        {
+            if (user.GetRole() != "Owner") return Results.Forbid();
+            var tenantId = user.GetTenantId();
+            if (tenantId == null) return Results.Unauthorized();
+            if (!confirm) return Results.BadRequest(new { error = "Confirmation required. Set confirm=true to proceed." });
+            try
+            {
+                await deleteService.DeleteTenantAsync(tenantId.Value, ct);
+                return Results.NoContent();
+            }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        })
+        .RequireAuthorization("OwnerOnly");
+
         return routes;
     }
 }

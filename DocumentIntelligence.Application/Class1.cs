@@ -74,6 +74,8 @@ public interface IStorageService
         string fileName,
         Stream content,
         CancellationToken cancellationToken);
+
+    Task DeleteObjectAsync(string storagePath, CancellationToken cancellationToken = default);
 }
 
 public interface IEmbeddingService
@@ -110,6 +112,16 @@ public interface IRateLimitService
 public interface IWorkspaceAccessService
 {
     Task<bool> WorkspaceBelongsToTenantAsync(Guid workspaceId, Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface IWorkspaceDeleteService
+{
+    Task DeleteWorkspaceAsync(Guid workspaceId, Guid tenantId, CancellationToken cancellationToken = default);
+}
+
+public interface ITenantDeleteService
+{
+    Task DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }
 
 /// <summary>Admin tenant overview stats for the dashboard.</summary>

@@ -80,6 +80,8 @@ builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("OwnerOrAdmin", policy =>
         policy.RequireRole("Owner", "Admin"));
+    options.AddPolicy("OwnerOnly", policy =>
+        policy.RequireRole("Owner"));
     options.AddPolicy("TenantUser", policy =>
         policy.RequireRole("Owner", "Admin", "Member"));
 });
@@ -102,6 +104,8 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddDocumentIntelligenceCaching(builder.Configuration);
 builder.Services.AddScoped<IWorkspaceAccessService, WorkspaceAccessService>();
+builder.Services.AddScoped<IWorkspaceDeleteService, WorkspaceDeleteService>();
+builder.Services.AddScoped<ITenantDeleteService, TenantDeleteService>();
 builder.Services.AddScoped<ITenantOverviewProvider, TenantOverviewProvider>();
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
 builder.Services.AddScoped<IVectorSearchService, VectorSearchService>();

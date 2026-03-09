@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
+import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
 
 type TenantMember = {
   id: string;
@@ -66,8 +67,11 @@ export default function TeamPage() {
   const [joinPassword, setJoinPassword] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deleteWorkspaceId, setDeleteWorkspaceId] = useState<string | null>(null);
+  const [showDeleteTenantModal, setShowDeleteTenantModal] = useState(false);
 
   const isLoggedIn = Boolean(role);
+  const isOwner = role === "Owner";
 
   const canCreateWorkspace = role === "Owner" || role === "Admin";
   const canInvite = role === "Owner" || role === "Admin";
@@ -143,7 +147,11 @@ export default function TeamPage() {
     }
     const data = Array.isArray(body) ? (body as Workspace[]) : [];
     setWorkspaces(data);
-    if (data.length > 0) setWorkspaceId((prev) => prev || data[0].id);
+    if (data.length > 0) {
+      setWorkspaceId((prev) => prev || data[0].id);
+    } else {
+      setWorkspaceId("");
+    }
   }
 
   async function loadTenants(initialTenantId?: string) {
@@ -297,6 +305,40 @@ export default function TeamPage() {
     } catch {
       showToast("Failed to copy.", "error");
     }
+  }
+
+  async function handleDeleteWorkspace() {
+    if (!deleteWorkspaceId) return;
+    const res = await fetch(`${getApiBase()}/workspaces/${deleteWorkspaceId}?confirm=true`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.status === 403) throw new Error("Only the Owner can delete workspaces.");
+    if (res.status === 404) throw new Error("Workspace not found.");
+    if (!res.ok) {
+      const body = await readResponseBody(res);
+      throw new Error(typeof body === "object" && body && "error" in body ? String((body as { error: string }).error) : formatError(res.status, body));
+    }
+    showToast("Workspace deleted.", "success");
+    await loadWorkspaces();
+    if (workspaceId === deleteWorkspaceId) {
+      const remaining = workspaces.find((w) => w.id !== deleteWorkspaceId);
+      setWorkspaceId(remaining?.id ?? "");
+    }
+  }
+
+  async function handleDeleteTenant() {
+    const res = await fetch(`${getApiBase()}/admin/tenant?confirm=true`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+    if (res.status === 403) throw new Error("Only the Owner can delete the tenant.");
+    if (!res.ok) {
+      const body = await readResponseBody(res);
+      throw new Error(typeof body === "object" && body && "error" in body ? String((body as { error: string }).error) : formatError(res.status, body));
+    }
+    showToast("Tenant deleted. Redirecting to sign in.", "success");
+    router.replace("/signin");
   }
 
   return (
@@ -557,6 +599,85 @@ export default function TeamPage() {
               </form>
             </motion.section>
           </div>
+
+          {/* Data Management — Owner only */}
+          {isOwner && (
+            <motion.section
+              initial={{ opacity: 0, y: 16 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              className="mt-8"
+            >
+              <div className="glass-surface rounded-xl border border-zinc-800/40 p-4 shadow-lg">
+                <h2 className="mb-1 text-sm font-semibold text-zinc-200">
+                  Data management
+                </h2>
+                <p className="mb-4 text-xs text-zinc-500">
+                  Permanently remove workspaces or the entire tenant. Deleted data cannot be recovered.
+                </p>
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="mb-2 text-xs font-medium text-zinc-400">Workspaces</h3>
+                    {workspaces.length === 0 ? (
+                      <p className="rounded-lg border border-zinc-700/40 bg-zinc-900/40 px-3 py-4 text-center text-xs text-zinc-500">
+                        No workspaces to manage
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5">
+                        {workspaces.map((w) => (
+                          <li
+                            key={w.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-zinc-700/40 bg-zinc-900/40 px-3 py-2.5"
+                          >
+                            <span className="truncate text-sm text-zinc-200">{w.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteWorkspaceId(w.id)}
+                              className="shrink-0 rounded-md border border-zinc-600/60 px-2.5 py-1 text-[11px] font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-300"
+                            >
+                              Delete
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="border-t border-zinc-800/60 pt-4">
+                    <h3 className="mb-2 text-xs font-medium text-zinc-400">Tenant</h3>
+                    <p className="mb-3 text-xs text-zinc-500">
+                      Deleting the tenant removes all workspaces, documents, and members.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteTenantModal(true)}
+                      className="rounded-md border border-zinc-600/60 px-3 py-1.5 text-xs font-medium text-zinc-400 transition-colors hover:border-zinc-500 hover:text-zinc-300"
+                    >
+                      Delete tenant
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.section>
+          )}
+
+          <ConfirmDeleteModal
+            open={!!deleteWorkspaceId}
+            onClose={() => setDeleteWorkspaceId(null)}
+            onConfirm={handleDeleteWorkspace}
+            title="Delete workspace"
+            description="This will permanently delete the workspace and all documents inside it. All embeddings and storage files will be removed. This action cannot be undone."
+            confirmLabel="Type DELETE to confirm"
+            confirmValue="DELETE"
+          />
+          <ConfirmDeleteModal
+            open={showDeleteTenantModal}
+            onClose={() => setShowDeleteTenantModal(false)}
+            onConfirm={handleDeleteTenant}
+            title="Delete tenant"
+            description="This will permanently delete the entire tenant, all workspaces, documents, members, and associated data. You will be signed out. This action cannot be undone."
+            confirmLabel="Type DELETE to confirm"
+            confirmValue="DELETE"
+          />
         </div>
       </div>
     </main>
