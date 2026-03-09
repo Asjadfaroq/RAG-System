@@ -44,20 +44,20 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={{ toasts, showToast, dismissToast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 top-4 z-50 flex flex-col items-center space-y-2">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-50 flex flex-col items-end space-y-3">
         {toasts.map((toast) => (
           <div
             key={toast.id}
             className={[
-              "pointer-events-auto flex max-w-sm items-center gap-3 rounded-lg px-4 py-2 text-sm shadow-lg",
+              "pointer-events-auto flex max-w-sm items-center gap-3 rounded-md border px-4 py-2 text-sm shadow-lg backdrop-blur",
               toast.variant === "success"
-                ? "bg-emerald-50 text-emerald-800 ring-1 ring-emerald-200"
+                ? "border-emerald-500/60 bg-gradient-to-r from-emerald-500/90 to-teal-400/90 text-white"
                 : "",
               toast.variant === "error"
-                ? "bg-rose-50 text-rose-800 ring-1 ring-rose-200"
+                ? "border-rose-500/60 bg-gradient-to-r from-rose-500/95 to-orange-500/90 text-white"
                 : "",
               toast.variant === "info"
-                ? "bg-zinc-900 text-zinc-50 ring-1 ring-zinc-700"
+                ? "border-sky-500/60 bg-gradient-to-r from-slate-900/95 via-slate-900/95 to-sky-900/90 text-slate-50"
                 : "",
             ]
               .filter(Boolean)
