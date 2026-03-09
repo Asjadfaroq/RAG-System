@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { DocumentStatusBadge, mapStatusCode } from "./DocumentStatusBadge";
 
 type SourceLike = {
   id: string;
@@ -19,7 +18,6 @@ export function SourceChunkCard({
   rtl?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const status = mapStatusCode(source.status ?? undefined);
 
   return (
     <div className="rounded-md border border-zinc-700 bg-zinc-900/60 text-xs">
@@ -37,7 +35,6 @@ export function SourceChunkCard({
           <span className="truncate font-medium">{source.fileName}</span>
         </div>
         <div className="flex items-center gap-2">
-          <DocumentStatusBadge status={status} locale={locale} />
           <span className="text-[11px] text-zinc-400">
             {open
               ? locale === "ar"
