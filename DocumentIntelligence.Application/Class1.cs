@@ -124,6 +124,11 @@ public interface ITenantDeleteService
     Task DeleteTenantAsync(Guid tenantId, CancellationToken cancellationToken = default);
 }
 
+public interface IDocumentDeleteService
+{
+    Task DeleteDocumentAsync(Guid documentId, Guid tenantId, CancellationToken cancellationToken = default);
+}
+
 /// <summary>Admin tenant overview stats for the dashboard.</summary>
 public record TenantOverviewDto(
     int TotalDocuments,

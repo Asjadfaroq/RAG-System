@@ -122,6 +122,27 @@ public static class DocumentEndpoints
         .DisableAntiforgery()
         .Accepts<IFormFile>("multipart/form-data");
 
+        group.MapDelete("/{documentId:guid}", async (
+            Guid documentId,
+            ClaimsPrincipal user,
+            IDocumentDeleteService deleteService,
+            CancellationToken ct) =>
+        {
+            var tenantId = user.GetTenantId();
+            if (tenantId == null)
+                return Results.Unauthorized();
+
+            try
+            {
+                await deleteService.DeleteDocumentAsync(documentId, tenantId.Value, ct);
+                return Results.NoContent();
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.NotFound(new { error = ex.Message });
+            }
+        });
+
         return routes;
     }
 }

@@ -903,6 +903,52 @@ public sealed class WorkspaceDeleteService : IWorkspaceDeleteService
     }
 }
 
+public sealed class DocumentDeleteService : IDocumentDeleteService
+{
+    private readonly ApplicationDbContext _db;
+    private readonly IStorageService _storage;
+    private readonly ICacheService _cache;
+    private readonly ILogger<DocumentDeleteService> _logger;
+
+    public DocumentDeleteService(ApplicationDbContext db, IStorageService storage, ICacheService cache, ILogger<DocumentDeleteService> logger)
+    {
+        _db = db;
+        _storage = storage;
+        _cache = cache;
+        _logger = logger;
+    }
+
+    public async Task DeleteDocumentAsync(Guid documentId, Guid tenantId, CancellationToken cancellationToken = default)
+    {
+        var document = await _db.Documents.FirstOrDefaultAsync(d => d.Id == documentId && d.TenantId == tenantId, cancellationToken);
+        if (document == null)
+        {
+            _logger.LogWarning("Document delete failed: not found. DocumentId={DocumentId}, TenantId={TenantId}", documentId, tenantId);
+            throw new InvalidOperationException("Document not found or access denied.");
+        }
+
+        var strategy = _db.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async ct =>
+        {
+            try
+            {
+                await _storage.DeleteObjectAsync(document.StoragePath, ct);
+                _logger.LogInformation("Deleted storage file for document {DocumentId}", document.Id);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete storage file {StoragePath}", document.StoragePath);
+            }
+
+            _db.Documents.Remove(document);
+            await _db.SaveChangesAsync(ct);
+
+            await _cache.InvalidateAsync($"documents:tenant:{tenantId:N}:workspace:{document.WorkspaceId:N}", ct);
+            _logger.LogInformation("Deleted document {DocumentId} from workspace {WorkspaceId}", documentId, document.WorkspaceId);
+        }, cancellationToken);
+    }
+}
+
 public sealed class TenantDeleteService : ITenantDeleteService
 {
     private readonly ApplicationDbContext _db;

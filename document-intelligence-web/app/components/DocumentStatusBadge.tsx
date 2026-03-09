@@ -22,13 +22,13 @@ const STATUS_STYLES: Record<DocumentStatus, string> = {
 
 export function mapStatusCode(code?: number | null): DocumentStatus {
   switch (code) {
-    case 0:
-      return "uploaded";
     case 1:
-      return "processing";
+      return "uploaded";
     case 2:
-      return "ready";
+      return "processing";
     case 3:
+      return "ready";
+    case 4:
       return "failed";
     default:
       return "uploaded";

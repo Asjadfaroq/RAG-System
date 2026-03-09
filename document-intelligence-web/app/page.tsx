@@ -11,14 +11,26 @@ import {
   AuthResponse,
 } from "./lib/api";
 import CreateWorkspaceModal from "./components/CreateWorkspaceModal";
+import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
 import { useLanguage } from "./components/LanguageProvider";
 import { useToast } from "./components/ToastProvider";
 import { ChatMessageBubble } from "./components/ChatMessageBubble";
+import { DocumentStatusBadge, mapStatusCode } from "./components/DocumentStatusBadge";
 
 type Workspace = {
   id: string;
   name: string;
   description: string | null;
+  createdAt: string;
+};
+
+type DocumentInWorkspace = {
+  id: string;
+  workspaceId: string;
+  fileName: string;
+  storagePath: string;
+  language: string | null;
+  status: number;
   createdAt: string;
 };
 
@@ -99,6 +111,8 @@ export default function Home() {
   const [uploadHistory, setUploadHistory] = useState<string[]>([]);
   const [uploadJustSucceeded, setUploadJustSucceeded] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [documents, setDocuments] = useState<DocumentInWorkspace[]>([]);
+  const [deleteDocumentId, setDeleteDocumentId] = useState<string | null>(null);
   const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
@@ -142,6 +156,11 @@ export default function Home() {
     void init();
     return () => { cancelled = true; };
   }, [router]);
+
+  useEffect(() => {
+    if (!workspaceId || !canCallApi) return;
+    void loadDocuments();
+  }, [workspaceId, canCallApi]);
 
   async function refreshSession(): Promise<boolean> {
     try {
@@ -189,6 +208,23 @@ export default function Home() {
     }
   }
 
+  async function loadDocuments() {
+    if (!workspaceId.trim()) {
+      setDocuments([]);
+      return;
+    }
+    const res = await fetchWithAuth(
+      `${getApiBase()}/documents/workspaces/${workspaceId}`,
+    );
+    const body = await readResponseBody(res);
+    if (!res.ok) {
+      setDocuments([]);
+      return;
+    }
+    const data = Array.isArray(body) ? (body as DocumentInWorkspace[]) : [];
+    setDocuments(data);
+  }
+
   async function loadTenants(initialTenantId?: string) {
     const res = await fetchWithAuth(`${getApiBase()}/auth/tenants`);
     const body = await readResponseBody(res);
@@ -215,6 +251,7 @@ export default function Home() {
     setTenants([]);
     setActiveTenantId("");
     setWorkspaces([]);
+    setDocuments([]);
     setWorkspaceId("");
     setStatus("Logged out.");
     router.replace("/signin");
@@ -249,6 +286,31 @@ export default function Home() {
       setStatus(msg);
       showToast(msg, "error");
     }
+  }
+
+  async function handleDeleteDocument() {
+    if (!deleteDocumentId) return;
+    const res = await fetchWithAuth(
+      `${getApiBase()}/documents/${deleteDocumentId}`,
+      { method: "DELETE" },
+    );
+    if (res.status === 404) {
+      setDeleteDocumentId(null);
+      await loadDocuments();
+      showToast("Document may have been removed. List refreshed.", "info");
+      return;
+    }
+    if (!res.ok) {
+      const body = await readResponseBody(res);
+      throw new Error(
+        typeof body === "object" && body && "error" in body
+          ? String((body as { error: string }).error)
+          : formatError(res.status, body),
+      );
+    }
+    setDeleteDocumentId(null);
+    showToast("Document deleted.", "success");
+    await loadDocuments();
   }
 
   async function handleCreateWorkspaceSubmit(
@@ -345,6 +407,7 @@ export default function Home() {
       if (fileInput) fileInput.value = "";
       setUploadJustSucceeded(true);
       setTimeout(() => setUploadJustSucceeded(false), 3500);
+      await loadDocuments();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Upload failed.";
       setStatus(msg);
@@ -581,6 +644,19 @@ export default function Home() {
             onClose={() => setShowCreateWorkspaceModal(false)}
             onSubmit={handleCreateWorkspaceSubmit}
           />
+          <ConfirmDeleteModal
+            open={!!deleteDocumentId}
+            onClose={() => setDeleteDocumentId(null)}
+            onConfirm={handleDeleteDocument}
+            title={locale === "ar" ? "حذف المستند" : "Delete document"}
+            description={
+              locale === "ar"
+                ? "سيتم حذف المستند وكل أجزائه من التخزين. لا يمكن التراجع عن هذا الإجراء."
+                : "This will permanently delete the document and all its chunks from storage. This action cannot be undone."
+            }
+            confirmLabel="Type DELETE to confirm"
+            confirmValue="DELETE"
+          />
 
           <section className="glass-surface flex min-h-0 flex-1 flex-col rounded-2xl border border-zinc-700/30 shadow-xl shadow-black/20">
             {/* Compact upload bar */}
@@ -664,6 +740,39 @@ export default function Home() {
             {busyUpload && (
               <div className="h-0.5 w-full overflow-hidden bg-zinc-900">
                 <div className="h-full w-1/3 animate-pulse bg-zinc-600/60" />
+              </div>
+            )}
+
+            {/* Documents in workspace */}
+            {workspaceId && documents.length > 0 && (
+              <div className="border-b border-zinc-700/30 px-3 py-2">
+                <p className="mb-1.5 text-[10px] font-medium text-zinc-500">
+                  {locale === "ar" ? "مستندات في المساحة" : "Documents in workspace"}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {documents.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-center gap-1.5 rounded-lg border border-zinc-700/40 bg-zinc-900/40 px-2.5 py-1.5"
+                    >
+                      <span className="max-w-[140px] truncate text-[11px] text-zinc-300" title={doc.fileName}>
+                        {doc.fileName}
+                      </span>
+                      <DocumentStatusBadge status={mapStatusCode(doc.status)} locale={locale === "ar" ? "ar" : "en"} />
+                      <button
+                        type="button"
+                        onClick={() => setDeleteDocumentId(doc.id)}
+                        className="ml-0.5 rounded p-0.5 text-zinc-500 hover:bg-zinc-700/60 hover:text-red-400"
+                        title={locale === "ar" ? "حذف" : "Delete"}
+                        aria-label="Delete document"
+                      >
+                        <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

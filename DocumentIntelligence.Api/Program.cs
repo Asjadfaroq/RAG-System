@@ -105,6 +105,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddDocumentIntelligenceCaching(builder.Configuration);
 builder.Services.AddScoped<IWorkspaceAccessService, WorkspaceAccessService>();
 builder.Services.AddScoped<IWorkspaceDeleteService, WorkspaceDeleteService>();
+builder.Services.AddScoped<IDocumentDeleteService, DocumentDeleteService>();
 builder.Services.AddScoped<ITenantDeleteService, TenantDeleteService>();
 builder.Services.AddScoped<ITenantOverviewProvider, TenantOverviewProvider>();
 builder.Services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
