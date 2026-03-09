@@ -235,8 +235,12 @@ export default function Home() {
       setActiveTenantId(auth.tenantId);
       await loadWorkspaces();
       setStatus("Tenant switched.");
+      showToast("Tenant switched.", "success");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to switch tenant.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to switch tenant.";
+      setStatus(msg);
+      showToast(msg, "error");
     }
   }
 
@@ -258,20 +262,27 @@ export default function Home() {
     await loadWorkspaces();
     setWorkspaceId(data.id);
     setStatus("Workspace created.");
+    showToast("Workspace created.", "success");
     return data.id;
   }
 
   async function handleRefreshWorkspaces() {
     if (!isLoggedIn) {
-      setStatus("Login first.");
+      const msg = "Login first.";
+      setStatus(msg);
+      showToast(msg, "error");
       return;
     }
     setStatus("Refreshing workspaces...");
     try {
       await loadWorkspaces();
       setStatus("Workspaces refreshed.");
+      showToast("Workspaces refreshed.", "success");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to refresh workspaces.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to refresh workspaces.";
+      setStatus(msg);
+      showToast(msg, "error");
     }
   }
 

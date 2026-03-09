@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
+import { useToast } from "../components/ToastProvider";
 
 type TenantMember = {
   id: string;
@@ -28,6 +29,7 @@ type TenantMembership = {
 
 export default function TeamPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState("");
   const [tenants, setTenants] = useState<TenantMembership[]>([]);
@@ -161,6 +163,7 @@ export default function TeamPage() {
     setWorkspaces([]);
     setWorkspaceId("");
     setStatus("Logged out.");
+    showToast("Logged out.", "success");
     router.replace("/signin");
   }
 
@@ -185,22 +188,32 @@ export default function TeamPage() {
       setActiveTenantId(auth.tenantId);
       await loadWorkspaces();
       setStatus("Tenant switched.");
+      showToast("Tenant switched.", "success");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to switch tenant.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to switch tenant.";
+      setStatus(msg);
+      showToast(msg, "error");
     }
   }
 
   async function handleRefreshWorkspaces() {
     if (!isLoggedIn) {
-      setStatus("Login first.");
+      const msg = "Login first.";
+      setStatus(msg);
+      showToast(msg, "error");
       return;
     }
     setStatus("Refreshing workspaces...");
     try {
       await loadWorkspaces();
       setStatus("Workspaces refreshed.");
+      showToast("Workspaces refreshed.", "success");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to refresh workspaces.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to refresh workspaces.";
+      setStatus(msg);
+      showToast(msg, "error");
     }
   }
 
@@ -224,10 +237,14 @@ export default function TeamPage() {
       const { code } = body as { code: string };
       setLatestCode(code);
       setStatus("Invite created. Share this code with the user.");
+      showToast("Invite created.", "success");
       setInviteEmail("");
       await loadMembers();
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to create invite.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to create invite.";
+      setStatus(msg);
+      showToast(msg, "error");
     } finally {
       setBusy(false);
     }
@@ -236,7 +253,9 @@ export default function TeamPage() {
   async function handleJoinTenant(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (!joinCode.trim()) {
-      setStatus("Invite code is required.");
+      const msg = "Invite code is required.";
+      setStatus(msg);
+      showToast(msg, "error");
       return;
     }
     setBusy(true);
@@ -256,12 +275,18 @@ export default function TeamPage() {
       if (!body || typeof body !== "object" || !("role" in body)) {
         throw new Error("Unexpected response from accept-invite endpoint.");
       }
-      setStatus("Joined tenant successfully. You can now switch tenants from the sidebar.");
+      const msg =
+        "Joined tenant successfully. You can now switch tenants from the sidebar.";
+      setStatus(msg);
+      showToast(msg, "success");
       setJoinCode("");
       setJoinPassword("");
       await loadMembers();
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Failed to join tenant.");
+      const msg =
+        err instanceof Error ? err.message : "Failed to join tenant.";
+      setStatus(msg);
+      showToast(msg, "error");
     } finally {
       setBusy(false);
     }

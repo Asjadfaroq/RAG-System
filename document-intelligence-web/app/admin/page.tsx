@@ -14,6 +14,7 @@ import {
   Line,
 } from "recharts";
 import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
+import { useToast } from "../components/ToastProvider";
 
 type AuthMe = { tenantId: string; email: string; role: string };
 
@@ -44,6 +45,7 @@ type TenantOverview = {
 };
 
 export default function AdminPage() {
+  const { showToast } = useToast();
   const [overview, setOverview] = useState<TenantOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +60,16 @@ export default function AdminPage() {
     try {
       let meRes = await fetch(`${apiBase}/auth/me`, { credentials: "include" });
       if (meRes.status === 401) {
-        setError("Please log in on the home page first.");
+        const msg = "Please log in on the home page first.";
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
       if (!meRes.ok) {
-        setError("Failed to verify session.");
+        const msg = "Failed to verify session.";
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
@@ -71,7 +77,9 @@ export default function AdminPage() {
       setEmail(me.email);
       setRole(me.role);
       if (me.role !== "Owner" && me.role !== "Admin") {
-        setError("Access denied. This page is for Owner or Admin only.");
+        const msg = "Access denied. This page is for Owner or Admin only.";
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
@@ -88,19 +96,25 @@ export default function AdminPage() {
       }
 
       if (res.status === 403) {
-        setError("Access denied. Owner or Admin role required.");
+        const msg = "Access denied. Owner or Admin role required.";
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
       if (res.status === 401) {
-        setError("Session expired. Please log in again.");
+        const msg = "Session expired. Please log in again.";
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
       if (!res.ok) {
         const body = await readResponseBody(res);
         const text = typeof body === "string" ? body : formatError(res.status, body);
-        setError(text || `Request failed: ${res.status}`);
+        const msg = text || `Request failed: ${res.status}`;
+        setError(msg);
+        showToast(msg, "error");
         setLoading(false);
         return;
       }
@@ -108,7 +122,9 @@ export default function AdminPage() {
       const data = (await res.json()) as TenantOverview;
       setOverview(data);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load overview.");
+      const msg = e instanceof Error ? e.message : "Failed to load overview.";
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setLoading(false);
     }

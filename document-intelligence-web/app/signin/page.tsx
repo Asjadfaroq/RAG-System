@@ -3,10 +3,17 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
+import {
+  getApiBase,
+  readResponseBody,
+  formatError,
+  AuthResponse,
+} from "../lib/api";
+import { useToast } from "../components/ToastProvider";
 
 export default function SignInPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [status, setStatus] = useState("");
@@ -41,9 +48,13 @@ export default function SignInPage() {
       if (!body || typeof body !== "object" || !("role" in body))
         throw new Error("Unexpected response.");
       setStatus("Success. Redirecting...");
+      showToast("Signed in successfully.", "success");
       router.replace("/");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Sign in failed.");
+      const msg =
+        err instanceof Error ? err.message : "Sign in failed.";
+      setStatus(msg);
+      showToast(msg, "error");
     } finally {
       setBusy(false);
     }

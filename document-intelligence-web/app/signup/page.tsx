@@ -4,9 +4,11 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { getApiBase, readResponseBody, formatError } from "../lib/api";
+import { useToast } from "../components/ToastProvider";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { showToast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -26,7 +28,9 @@ export default function SignUpPage() {
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (password !== confirmPassword) {
-      setStatus("Passwords do not match.");
+      const msg = "Passwords do not match.";
+      setStatus(msg);
+      showToast(msg, "error");
       return;
     }
     setBusy(true);
@@ -46,9 +50,13 @@ export default function SignUpPage() {
       if (!body || typeof body !== "object" || !("role" in body))
         throw new Error("Unexpected response.");
       setStatus("Account created. Redirecting...");
+      showToast("Account created.", "success");
       router.replace("/");
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : "Create account failed.");
+      const msg =
+        err instanceof Error ? err.message : "Create account failed.";
+      setStatus(msg);
+      showToast(msg, "error");
     } finally {
       setBusy(false);
     }
