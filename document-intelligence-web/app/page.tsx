@@ -55,12 +55,6 @@ type TenantMembership = {
   role: string;
 };
 
-const quickQuestions = [
-  "What are the key skills in this CV?",
-  "Summarize the document",
-  "What technologies are mentioned?",
-];
-
 /** Arabic script range (includes Arabic, Persian, Urdu, etc.). */
 const ARABIC_SCRIPT_REGEX = /[\u0600-\u06FF]/;
 
@@ -105,6 +99,7 @@ export default function Home() {
   const [uploadHistory, setUploadHistory] = useState<string[]>([]);
   const [dragActive, setDragActive] = useState(false);
   const [streamingChatId, setStreamingChatId] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const questionTextAreaRef = useRef<HTMLTextAreaElement | null>(null);
   const isLoggedIn = Boolean(role);
@@ -424,17 +419,22 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" });
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [chat.length]);
 
   useEffect(() => {
     const el = questionTextAreaRef.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
+    el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
   }, [question]);
+
+  useEffect(() => {
+    if (!showSettings) return;
+    const close = () => setShowSettings(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [showSettings]);
 
   function handleCopyAnswer(answer: string) {
     if (typeof navigator === "undefined" || !navigator.clipboard) return;
@@ -458,213 +458,110 @@ export default function Home() {
     <main className="h-screen bg-gradient-to-b from-[#050816] via-black to-black text-zinc-50" dir={dir}>
       <div className="flex h-screen w-full overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden w-72 flex-col border-r border-zinc-900/80 bg-zinc-950/80 p-4 backdrop-blur md:flex">
-          <div className="mb-6">
-            <h1 className="text-lg font-semibold">
-              {locale === "ar" ? "نظام الذكاء المستندي" : "Document Intelligence"}
-            </h1>
-            <p className="mt-1 text-xs text-zinc-500">
-              {email} &middot; {role}
-            </p>
-          </div>
+        <aside className="hidden w-56 flex-shrink-0 flex-col border-r border-zinc-800/50 bg-zinc-950/50 p-3 md:flex">
+          <h1 className="mb-4 text-sm font-semibold text-zinc-100">
+            {locale === "ar" ? "الذكاء المستندي" : "Doc Intelligence"}
+          </h1>
 
-          <div className="mb-4 space-y-2">
-            <p className="text-xs font-semibold uppercase text-zinc-500">
-              {locale === "ar" ? "المستأجر" : "Tenant"}
-            </p>
+          <div className="space-y-2">
             <select
-              className="w-full rounded border border-zinc-700 bg-transparent p-2 text-sm"
+              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-2 py-1.5 text-xs text-zinc-200 focus:border-zinc-500 focus:outline-none"
               value={activeTenantId}
               onChange={(e) => handleSwitchTenant(e.target.value)}
               disabled={tenants.length === 0}
             >
-              <option value="">
-                {locale === "ar" ? "اختر المستأجر" : "Select tenant"}
-              </option>
               {tenants.map((t) => (
                 <option key={t.tenantId} value={t.tenantId}>
-                  {t.tenantName} ({t.role})
+                  {t.tenantName}
                 </option>
               ))}
             </select>
-          </div>
-
-          <div className="mb-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-xs font-semibold uppercase text-zinc-500">
-                {locale === "ar" ? "مساحات العمل" : "Workspaces"}
-              </p>
-              <button
-                type="button"
-                className="text-xs text-zinc-400 hover:text-zinc-200"
-                onClick={handleRefreshWorkspaces}
+            <div className="flex gap-1">
+              <select
+                className="flex-1 rounded-lg border border-zinc-700/60 bg-zinc-900/60 px-2 py-1.5 text-xs text-zinc-200 focus:border-zinc-500 focus:outline-none"
+                value={workspaceId}
+                onChange={(e) => setWorkspaceId(e.target.value)}
+                disabled={workspaces.length === 0}
               >
-                Refresh
-              </button>
+                {workspaces.map((w) => (
+                  <option key={w.id} value={w.id}>
+                    {w.name}
+                  </option>
+                ))}
+              </select>
+              {canCreateWorkspace && (
+                <button
+                  type="button"
+                  className="rounded-lg bg-zinc-700/60 px-2 py-1.5 text-xs text-zinc-200 hover:bg-zinc-600/60"
+                  onClick={() => setShowCreateWorkspaceModal(true)}
+                  title={locale === "ar" ? "مساحة عمل جديدة" : "New workspace"}
+                >
+                  +
+                </button>
+              )}
             </div>
-            <select
-              className="w-full rounded border border-zinc-700 bg-transparent p-2 text-sm"
-              value={workspaceId}
-              onChange={(e) => setWorkspaceId(e.target.value)}
-              disabled={workspaces.length === 0}
-            >
-              <option value="">
-                {locale === "ar" ? "اختر مساحة عمل" : "Select workspace"}
-              </option>
-              {workspaces.map((w) => (
-                <option key={w.id} value={w.id}>
-                  {w.name}
-                </option>
-              ))}
-            </select>
-            {canCreateWorkspace && (
-              <button
-                type="button"
-                className="mt-1 w-full rounded bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
-                onClick={() => setShowCreateWorkspaceModal(true)}
-              >
-                {locale === "ar" ? "مساحة عمل جديدة" : "New workspace"}
-              </button>
-            )}
           </div>
 
-          <nav className="mb-4 space-y-1 text-sm">
-            <Link
-              href="/"
-              className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
-            >
+          <nav className="mt-3 space-y-0.5 border-t border-zinc-800/50 pt-3">
+            <Link href="/" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
               {locale === "ar" ? "لوحة التحكم" : "Dashboard"}
             </Link>
-            <Link
-              href="/team"
-              className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
-            >
+            <Link href="/team" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
               {locale === "ar" ? "الفريق" : "Team"}
             </Link>
             {canCreateWorkspace && (
-              <a
-                href="/admin"
-                className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
-              >
+              <a href="/admin" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
                 {locale === "ar" ? "التحليلات" : "Admin"}
               </a>
             )}
           </nav>
 
-          <div className="mb-4 space-y-3 text-xs">
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                {locale === "ar" ? "سجل المحادثة" : "Chat history"}
-              </p>
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-zinc-800/80 bg-zinc-950/40 p-2">
-                {chat.length === 0 && (
-                  <p className="text-[11px] text-zinc-500">
-                    {locale === "ar" ? "لا توجد محادثات بعد." : "No conversations yet."}
-                  </p>
-                )}
-                {chat
-                  .slice()
-                  .reverse()
-                  .slice(0, 8)
-                  .map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="line-clamp-1 w-full rounded px-2 py-1 text-left text-[11px] text-zinc-300 hover:bg-zinc-800/80"
-                      title={item.question}
-                      onClick={() => {
-                        if (!chatEndRef.current) return;
-                        chatEndRef.current.scrollIntoView({
-                          behavior: "smooth",
-                          block: "end",
-                        });
-                      }}
-                    >
-                      {item.question}
-                    </button>
-                  ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                {locale === "ar" ? "سجل الرفع" : "Upload history"}
-              </p>
-              <div className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-zinc-800/80 bg-zinc-950/40 p-2">
-                {uploadHistory.length === 0 && (
-                  <p className="text-[11px] text-zinc-500">
-                    {locale === "ar" ? "لا توجد عمليات رفع بعد." : "No uploads yet."}
-                  </p>
-                )}
-                {uploadHistory.map((name, idx) => (
-                  <p
-                    key={`${name}-${idx}`}
-                    className="line-clamp-1 rounded px-2 py-1 text-[11px] text-zinc-300"
-                    title={name}
+          <div className="mt-3 flex-1 space-y-1 overflow-hidden border-t border-zinc-800/50 pt-3">
+            <p className="text-[10px] font-medium text-zinc-500">
+              {locale === "ar" ? "المحادثات" : "Conversations"}
+            </p>
+            <div className="max-h-32 overflow-y-auto">
+              {chat.length === 0 ? (
+                <p className="px-2 py-1 text-[11px] text-zinc-600">{locale === "ar" ? "—" : "—"}</p>
+              ) : (
+                chat.slice().reverse().slice(0, 6).map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="line-clamp-1 w-full rounded px-2 py-1 text-left text-[11px] text-zinc-500 hover:bg-zinc-800/40 hover:text-zinc-300"
+                    title={item.question}
+                    onClick={() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" })}
                   >
-                    {name}
-                  </p>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                {locale === "ar" ? "الإعدادات" : "Settings"}
-              </p>
-              <div className="space-y-1 rounded-md border border-zinc-800/80 bg-zinc-950/40 p-2">
-                <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                  <span>{locale === "ar" ? "الوضع الداكن" : "Dark mode"}</span>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] text-emerald-400">
-                    {locale === "ar" ? "مفعل" : "On"}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-[11px] text-zinc-300">
-                  <span>{locale === "ar" ? "لغة الواجهة" : "Interface language"}</span>
-                  <span className="text-[10px] text-zinc-400">
-                    {locale === "ar" ? "العربية" : "English"}
-                  </span>
-                </div>
-              </div>
+                    {item.question}
+                  </button>
+                ))
+              )}
             </div>
           </div>
 
-          <div className="mt-auto space-y-2 text-sm">
-            <p className="text-xs font-semibold uppercase text-zinc-500">
-              {locale === "ar" ? "الجلسة" : "Session"}
-            </p>
+          <div className="mt-auto border-t border-zinc-800/50 pt-3">
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full rounded border border-zinc-700 px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800"
+              className="w-full rounded px-2 py-1.5 text-left text-xs text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200"
             >
               {locale === "ar" ? "تسجيل الخروج" : "Logout"}
             </button>
-            {status && (
-              <p className="text-xs text-zinc-500 line-clamp-3">{status}</p>
-            )}
           </div>
         </aside>
 
         {/* Main content */}
-        <div className="flex-1 flex flex-col p-3 md:p-6">
-          <header className="mb-4 flex items-center justify-between">
-            <div>
-              <h2 className="bg-gradient-to-r from-zinc-50 to-zinc-400 bg-clip-text text-xl font-semibold text-transparent md:text-2xl">
-                {locale === "ar" ? "مساعد المستندات الذكي" : "Document Intelligence Assistant"}
-              </h2>
-              <p className="mt-1 text-xs text-zinc-400 md:text-sm">
-                {locale === "ar"
-                  ? "ارفع ملفات PDF واسأل أسئلة شبيهة بمحادثات الذكاء الاصطناعي."
-                  : "Upload PDFs and chat with an AI that understands your documents."}
-              </p>
-            </div>
+        <div className="flex min-h-0 flex-1 flex-col p-3 md:p-4">
+          <header className="mb-2 flex items-center justify-between">
+            <h2 className="text-base font-medium text-zinc-100">
+              {locale === "ar" ? "المحادثة" : "Chat"}
+            </h2>
             <button
               type="button"
               onClick={toggleLocale}
-              className="rounded-full border border-zinc-700/70 bg-zinc-950/60 px-3 py-1 text-xs text-zinc-300 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-800/80"
+              className="rounded px-2 py-1 text-[11px] text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200"
             >
-              {locale === "ar" ? "English" : "العربية"}
+              {locale === "ar" ? "EN" : "العربية"}
             </button>
           </header>
 
@@ -674,204 +571,177 @@ export default function Home() {
             onSubmit={handleCreateWorkspaceSubmit}
           />
 
-          <section className="flex flex-1 min-h-0 flex-col rounded-3xl border border-zinc-800/80 bg-gradient-to-b from-zinc-950/60 via-zinc-950/40 to-black/80 p-3 shadow-[0_0_80px_rgba(15,23,42,0.8)] md:p-4 lg:p-6">
-            {/* Upload area / empty state */}
-            {chat.length === 0 && !uploadFile && (
-              <motion.div
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-4 rounded-2xl border border-dashed border-zinc-700/70 bg-zinc-950/50 p-6 text-center shadow-inner"
-              >
-                <p className="text-sm font-medium text-zinc-100">
-                  {locale === "ar"
-                    ? "ارفع المستندات لبدء طرح الأسئلة"
-                    : "Upload documents to start asking questions"}
-                </p>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {locale === "ar"
-                    ? "اسحب وأفلت ملفات PDF هنا، أو استخدم زر التصفح أدناه."
-                    : "Drag and drop PDFs here, or use the picker below."}
-                </p>
-              </motion.div>
-            )}
-
+          <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-800/40 bg-zinc-950/30">
+            {/* Compact upload bar */}
             <form
               onSubmit={handleUpload}
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-              }}
+              onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+              onDragLeave={(e) => { e.preventDefault(); setDragActive(false); }}
               onDrop={(e) => {
                 e.preventDefault();
                 setDragActive(false);
                 const file = e.dataTransfer.files?.[0];
-                if (file && file.type === "application/pdf") {
-                  setUploadFile(file);
-                }
+                if (file?.type === "application/pdf") setUploadFile(file);
               }}
-              className={`mb-3 flex items-center gap-3 rounded-2xl border border-dashed border-zinc-700/70 bg-zinc-950/50 px-3 py-2 text-xs transition hover:border-zinc-500/90 ${
-                dragActive ? "border-emerald-500/60 bg-zinc-900/80" : ""
+              className={`flex items-center gap-2 border-b border-zinc-800/40 px-3 py-2 ${
+                dragActive ? "bg-zinc-800/30" : ""
               }`}
             >
-              <div className="flex flex-1 items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500/20 to-sky-500/10 text-emerald-300 shadow-inner">
-                  📄
-                </span>
-                <div className="flex flex-col">
-                  <span className="text-[11px] font-medium text-zinc-200">
-                    {locale === "ar"
-                      ? "اسحب ملف PDF هنا أو انقر للاختيار"
-                      : "Drag a PDF here or click to browse"}
-                  </span>
-                  <span className="text-[10px] text-zinc-500">
-                    {locale === "ar"
-                      ? "يتم معالجة المستندات وتحضيرها لأسئلة RAG."
-                      : "Documents will be processed and indexed for RAG."}
-                  </span>
-                  <div className="mt-1 flex flex-wrap items-center gap-2">
-                    {uploadFile && (
-                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200">
-                        <span className="line-clamp-1 max-w-[140px]">
-                          {uploadFile.name}
-                        </span>
-                        <button
-                          type="button"
-                          className="ml-1 text-[10px] text-emerald-300/80 hover:text-emerald-100"
-                          onClick={() => setUploadFile(null)}
-                        >
-                          ✕
-                        </button>
-                      </span>
-                    )}
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      className="hidden"
-                      id="pdf-upload-input"
-                      onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-                    />
-                    <label
-                      htmlFor="pdf-upload-input"
-                      className="inline-flex cursor-pointer items-center rounded-full border border-zinc-700/80 bg-zinc-900/60 px-2 py-0.5 text-[11px] text-zinc-200 shadow-sm transition hover:border-zinc-500 hover:bg-zinc-800/80"
-                    >
-                      {locale === "ar" ? "استعراض" : "Browse"}
-                    </label>
-                    <input
-                      className="w-40 rounded-full border border-zinc-700/70 bg-zinc-950/60 px-2 py-1 text-[11px] text-zinc-200 placeholder:text-zinc-600 focus:border-emerald-500/70 focus:outline-none"
-                      placeholder={
-                        locale === "ar"
-                          ? "اللغة (اختياري: en/ar)"
-                          : "Language (optional: en/ar)"
-                      }
-                      value={language}
-                      onChange={(e) => setLanguage(e.target.value)}
-                    />
-                  </div>
-                </div>
-              </div>
-              <button
-                className="inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-3 py-1.5 text-[11px] font-medium text-white shadow-lg shadow-emerald-900/40 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={busyUpload || !isLoggedIn || !workspaceId || !uploadFile}
-                type="submit"
+              <input
+                type="file"
+                accept="application/pdf"
+                className="hidden"
+                id="pdf-upload-input"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+              <label
+                htmlFor="pdf-upload-input"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-900/50 px-2 py-1.5 text-[11px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
               >
-                {busyUpload && (
-                  <span className="h-3 w-3 animate-spin rounded-full border border-white/30 border-t-transparent" />
+                <span>📄</span>
+                {uploadFile ? (
+                  <span className="max-w-[120px] truncate text-zinc-300">{uploadFile.name}</span>
+                ) : (
+                  <span>{locale === "ar" ? "رفع PDF" : "Upload PDF"}</span>
                 )}
-                {busyUpload
-                  ? locale === "ar"
-                    ? "جاري الرفع..."
-                    : "Uploading..."
-                  : locale === "ar"
-                  ? "رفع"
-                  : "Upload"}
+              </label>
+              {uploadFile && (
+                <button
+                  type="button"
+                  className="text-[10px] text-zinc-500 hover:text-zinc-300"
+                  onClick={() => setUploadFile(null)}
+                >
+                  ✕
+                </button>
+              )}
+              <input
+                className="w-24 rounded border border-zinc-700/50 bg-transparent px-2 py-1 text-[11px] text-zinc-400 placeholder:text-zinc-600 focus:outline-none"
+                placeholder="en/ar"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              />
+              <button
+                type="submit"
+                disabled={busyUpload || !uploadFile}
+                className="ml-auto rounded-lg bg-zinc-700 px-2 py-1.5 text-[11px] font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+              >
+                {busyUpload ? "…" : locale === "ar" ? "رفع" : "Upload"}
               </button>
             </form>
 
             {busyUpload && (
-              <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-zinc-900/80">
-                <div className="h-full w-1/2 animate-[shimmer_1.4s_infinite] rounded-full bg-gradient-to-r from-emerald-500/70 via-sky-500/80 to-emerald-500/70" />
+              <div className="h-0.5 w-full overflow-hidden bg-zinc-900">
+                <div className="h-full w-1/3 animate-pulse bg-zinc-600/60" />
               </div>
             )}
 
             {/* Chat area */}
-            <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3 md:p-4">
-              {/* Top controls and suggestions */}
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-zinc-300">
-                  <span className="rounded-full bg-zinc-900/80 px-2 py-0.5 text-zinc-400">
-                    {locale === "ar" ? "الوضع" : "Mode"}
-                  </span>
-                  <select
-                    className="rounded-full border border-zinc-700/70 bg-zinc-950/80 px-2 py-0.5 text-[11px]"
-                    value={mode}
-                    onChange={(e) => setMode(e.target.value as "vector" | "hybrid")}
-                  >
-                    <option value="vector">vector</option>
-                    <option value="hybrid">hybrid</option>
-                  </select>
-                  <span className="rounded-full bg-zinc-900/80 px-2 py-0.5 text-zinc-400">
-                    TopK
-                  </span>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    className="w-16 rounded-full border border-zinc-700/70 bg-zinc-950/80 px-2 py-0.5 text-[11px]"
-                    value={topK}
-                    onChange={(e) => setTopK(Number(e.target.value))}
-                  />
-                  <span className="rounded-full bg-zinc-900/80 px-2 py-0.5 text-zinc-400">
-                    {locale === "ar" ? "لغة الإجابة" : "Answer in"}
-                  </span>
-                  <select
-                    className="rounded-full border border-zinc-700/70 bg-zinc-950/80 px-2 py-0.5 text-[11px]"
-                    value={answerLanguage}
-                    onChange={(e) =>
-                      setAnswerLanguage(e.target.value as AnswerLanguagePreference)
-                    }
-                    title="Force answer language (Auto = follow question/content)"
-                  >
-                    <option value="auto">
-                      {locale === "ar" ? "تلقائي" : "Auto"}
-                    </option>
-                    <option value="en">
-                      {locale === "ar" ? "الإنجليزية" : "English"}
-                    </option>
-                    <option value="ar">
-                      {locale === "ar" ? "العربية" : "Arabic"}
-                    </option>
-                  </select>
-                </div>
-              </div>
-
+            <div className="flex min-h-0 flex-1 flex-col p-3">
+              {/* Empty state: centered input (ChatGPT-style) */}
               {chat.length === 0 && (
-                <div className="mb-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/60 p-3 text-[12px] text-zinc-300">
-                  <p className="mb-2 font-medium">
+                <div className="flex flex-1 flex-col items-center justify-center px-4">
+                  <p className="mb-6 text-center text-[15px] font-medium text-zinc-400">
                     {locale === "ar"
-                      ? "جرّب أحد هذه الأسئلة على مستنداتك:"
-                      : "Try asking one of these on your documents:"}
+                      ? "اطرح أسئلة حول مستنداتك"
+                      : "Ask questions about your documents"}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {quickQuestions.map((q) => (
+                  <form
+                    className="w-full max-w-2xl"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void ask(question);
+                    }}
+                  >
+                    <div className="flex items-center gap-2 rounded-2xl border border-zinc-700/50 bg-zinc-900/50 px-4 py-3 shadow-sm focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-600/30">
                       <button
-                        key={q}
                         type="button"
-                        className="rounded-full border border-zinc-700/80 bg-zinc-950/80 px-3 py-1 text-[11px] text-zinc-200 transition hover:border-emerald-500/60 hover:bg-emerald-500/10"
-                        onClick={() => ask(q)}
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                        title={locale === "ar" ? "إرفاق PDF" : "Attach PDF"}
+                        onClick={() => document.getElementById("pdf-upload-input")?.click()}
                       >
-                        {q}
+                        <span className="text-sm">📎</span>
                       </button>
-                    ))}
-                  </div>
+                      <textarea
+                        ref={questionTextAreaRef}
+                        className="min-h-[24px] max-h-32 flex-1 resize-none bg-transparent text-[14px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+                        placeholder={locale === "ar" ? "اكتب سؤالك هنا..." : "Type your question here..."}
+                        value={question}
+                        onChange={(e) => setQuestion(e.target.value)}
+                      />
+                      <div className="relative flex flex-shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                          title={locale === "ar" ? "إعدادات" : "Settings"}
+                          onClick={(e) => { e.stopPropagation(); setShowSettings((s) => !s); }}
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                        </button>
+                        {showSettings && (
+                          <div
+                            className="absolute bottom-full right-0 mb-1 w-48 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-2 shadow-xl"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <div className="space-y-2 text-[11px]">
+                              <div className="flex items-center justify-between">
+                                <span className="text-zinc-500">Mode</span>
+                                <select
+                                  className="rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                                  value={mode}
+                                  onChange={(e) => setMode(e.target.value as "vector" | "hybrid")}
+                                >
+                                  <option value="vector">vector</option>
+                                  <option value="hybrid">hybrid</option>
+                                </select>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-zinc-500">TopK</span>
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={10}
+                                  className="w-12 rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                                  value={topK}
+                                  onChange={(e) => setTopK(Number(e.target.value))}
+                                />
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-zinc-500">Answer</span>
+                                <select
+                                  className="rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                                  value={answerLanguage}
+                                  onChange={(e) => setAnswerLanguage(e.target.value as AnswerLanguagePreference)}
+                                >
+                                  <option value="auto">Auto</option>
+                                  <option value="en">EN</option>
+                                  <option value="ar">AR</option>
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        <button
+                          type="submit"
+                          disabled={busyAsk || !workspaceId || !question.trim()}
+                          className="flex h-8 items-center justify-center rounded-lg bg-zinc-100 px-4 text-[12px] font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+                        >
+                          {busyAsk ? (
+                            <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
+                          ) : (
+                            "Ask"
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </form>
                 </div>
               )}
 
-              {/* Messages list */}
-              <div className="mb-2 flex-1 space-y-3 overflow-y-auto pr-1">
+              {/* Messages list (when chat has content) */}
+              <div className={`flex-1 space-y-3 overflow-y-auto pr-1 ${chat.length === 0 ? "hidden" : "mb-2"}`}>
                 <AnimatePresence initial={false}>
                   {chat.map((item) => {
                     const answerDir = resolveAnswerDir(
@@ -909,23 +779,19 @@ export default function Home() {
                             <>
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1 rounded-full border border-zinc-700/70 bg-zinc-900/80 px-2 py-0.5 hover:border-zinc-500 hover:text-zinc-200"
+                                className="rounded px-1.5 py-0.5 hover:bg-zinc-700/50 hover:text-zinc-200"
                                 onClick={() => handleCopyAnswer(item.answer)}
+                                title={locale === "ar" ? "نسخ" : "Copy"}
                               >
-                                <span>⧉</span>
-                                <span>
-                                  {locale === "ar" ? "نسخ" : "Copy"}
-                                </span>
+                                Copy
                               </button>
                               <button
                                 type="button"
-                                className="inline-flex items-center gap-1 rounded-full border border-zinc-700/70 bg-zinc-900/80 px-2 py-0.5 hover:border-emerald-500 hover:text-emerald-300"
+                                className="rounded px-1.5 py-0.5 hover:bg-zinc-700/50 hover:text-zinc-200"
                                 onClick={() => handleRegenerate(item)}
+                                title={locale === "ar" ? "إعادة توليد" : "Regenerate"}
                               >
-                                <span>⟳</span>
-                                <span>
-                                  {locale === "ar" ? "إعادة توليد" : "Regenerate"}
-                                </span>
+                                ⟳
                               </button>
                             </>
                           }
@@ -938,107 +804,112 @@ export default function Home() {
                 <div ref={chatEndRef} />
               </div>
 
-              {/* Thinking steps / loader */}
               <AnimatePresence>
                 {busyAsk && (
                   <motion.div
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 8 }}
-                    className="mb-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/70 p-3 text-[11px] text-zinc-300"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="mb-2 rounded-lg border border-zinc-700/40 bg-zinc-800/30 px-3 py-2"
                   >
-                    <p className="mb-2 font-medium">
-                      {locale === "ar"
-                        ? "المساعد يفكر في إجابتك..."
-                        : "The assistant is thinking..."}
-                    </p>
                     <ThinkingSteps locale={locale === "ar" ? "ar" : "en"} />
                   </motion.div>
                 )}
               </AnimatePresence>
 
-              {/* Sticky input */}
+              {/* Sticky input (only when chat has messages) */}
+              {chat.length > 0 && (
               <form
-                className="mt-auto flex flex-col gap-2 rounded-2xl border border-zinc-800/80 bg-zinc-950/80 p-2 shadow-[0_0_40px_rgba(15,23,42,0.8)] md:flex-row md:items-end"
+                className="mt-auto flex items-end gap-2 border-t border-zinc-800/40 pt-3"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void ask(question);
                 }}
               >
-                <div className="flex flex-1 items-end gap-2">
+                <button
+                  type="button"
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                  title={locale === "ar" ? "إرفاق PDF" : "Attach PDF"}
+                  onClick={() => document.getElementById("pdf-upload-input")?.click()}
+                >
+                  <span className="text-sm">📎</span>
+                </button>
+                <textarea
+                  ref={questionTextAreaRef}
+                  className="min-h-[36px] max-h-24 flex-1 resize-none rounded-lg border border-zinc-700/50 bg-zinc-900/50 px-3 py-2 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none"
+                  placeholder={locale === "ar" ? "اسأل عن مستنداتك..." : "Ask about your documents..."}
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                />
+                <div className="relative flex flex-shrink-0 items-center gap-1">
                   <button
                     type="button"
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-900/90 text-zinc-300 shadow-sm transition hover:bg-zinc-800"
-                    title={
-                      locale === "ar"
-                        ? "اختيار ملف PDF"
-                        : "Attach a PDF"
-                    }
-                    onClick={() => {
-                      const input = document.getElementById(
-                        "pdf-upload-input",
-                      ) as HTMLInputElement | null;
-                      input?.click();
-                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                    title={locale === "ar" ? "إعدادات" : "Settings"}
+                    onClick={(e) => { e.stopPropagation(); setShowSettings((s) => !s); }}
                   >
-                    📎
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
                   </button>
-                  <div className="relative flex-1">
-                    <textarea
-                      ref={questionTextAreaRef}
-                      className="max-h-32 min-h-[40px] w-full resize-none rounded-2xl border border-zinc-700/80 bg-zinc-950/80 px-3 py-2 text-[13px] leading-relaxed text-zinc-50 placeholder:text-zinc-600 focus:border-emerald-500/70 focus:outline-none"
-                      placeholder={
-                        locale === "ar"
-                          ? "اطرح أسئلة دقيقة حول مستنداتك..."
-                          : "Ask precise questions about your documents..."
-                      }
-                      value={question}
-                      onChange={(e) => setQuestion(e.target.value)}
-                    />
-                    {uploadFile && (
-                      <div className="pointer-events-none absolute -top-4 left-2 flex gap-1 text-[10px] text-emerald-300">
-                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5">
-                          <span className="mr-1">●</span>
-                          {locale === "ar" ? "سيتم استخدام هذا الملف" : "Using selected file"}
-                        </span>
+                  {showSettings && (
+                    <div
+                      className="absolute bottom-full right-0 mb-1 w-48 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-2 shadow-xl"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <div className="space-y-2 text-[11px]">
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-500">Mode</span>
+                          <select
+                            className="rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                            value={mode}
+                            onChange={(e) => setMode(e.target.value as "vector" | "hybrid")}
+                          >
+                            <option value="vector">vector</option>
+                            <option value="hybrid">hybrid</option>
+                          </select>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-500">TopK</span>
+                          <input
+                            type="number"
+                            min={1}
+                            max={10}
+                            className="w-12 rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                            value={topK}
+                            onChange={(e) => setTopK(Number(e.target.value))}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-zinc-500">Answer</span>
+                          <select
+                            className="rounded border border-zinc-700/50 bg-transparent px-1.5 py-0.5 text-zinc-300"
+                            value={answerLanguage}
+                            onChange={(e) => setAnswerLanguage(e.target.value as AnswerLanguagePreference)}
+                          >
+                            <option value="auto">Auto</option>
+                            <option value="en">EN</option>
+                            <option value="ar">AR</option>
+                          </select>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex items-end gap-2">
-                  <select
-                    className="h-9 rounded-full border border-zinc-700/80 bg-zinc-950/80 px-2 text-[11px] text-zinc-200"
-                    value={workspaceId}
-                    onChange={(e) => setWorkspaceId(e.target.value)}
-                  >
-                    <option value="">
-                      {locale === "ar" ? "مساحة العمل" : "Workspace"}
-                    </option>
-                    {workspaces.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name}
-                      </option>
-                    ))}
-                  </select>
+                    </div>
+                  )}
                   <button
-                    className="inline-flex h-9 items-center justify-center rounded-full bg-gradient-to-r from-emerald-500 to-sky-500 px-5 text-[12px] font-semibold text-white shadow-lg shadow-emerald-900/50 disabled:cursor-not-allowed disabled:opacity-60"
-                    disabled={busyAsk || !isLoggedIn || !workspaceId || !question.trim()}
                     type="submit"
+                    disabled={busyAsk || !workspaceId || !question.trim()}
+                    className="flex h-8 items-center justify-center rounded-lg bg-zinc-100 px-3 text-[12px] font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
                   >
                     {busyAsk ? (
-                      <span className="flex items-center gap-2">
-                        <span className="h-3 w-3 animate-spin rounded-full border border-white/30 border-t-transparent" />
-                        {locale === "ar" ? "جاري التوليد..." : "Generating..."}
-                      </span>
+                      <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
                     ) : (
-                      <span className="flex items-center gap-2">
-                        <span>Ask</span>
-                        <span>↩︎</span>
-                      </span>
+                      "Ask"
                     )}
                   </button>
                 </div>
               </form>
+              )}
             </div>
           </section>
         </div>
@@ -1050,29 +921,16 @@ export default function Home() {
 function ThinkingSteps({ locale }: { locale: "en" | "ar" }) {
   const steps =
     locale === "ar"
-      ? [
-          "قراءة المستندات...",
-          "البحث في المتجهات الدلالية...",
-          "توليد الإجابة...",
-        ]
-      : ["Reading documents...", "Searching semantic vectors...", "Generating answer..."];
+      ? ["قراءة المستندات...", "البحث في المتجهات...", "توليد الإجابة..."]
+      : ["Reading documents...", "Searching vectors...", "Generating..."];
 
   return (
-    <div className="space-y-1.5">
-      {steps.map((step, index) => (
-        <motion.div
-          key={step}
-          initial={{ opacity: 0, x: -8 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ delay: index * 0.2, duration: 0.25 }}
-          className="flex items-center gap-2"
-        >
-          <span className="relative inline-flex h-4 w-4 items-center justify-center">
-            <span className="absolute inline-flex h-4 w-4 animate-ping rounded-full bg-emerald-500/40" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-          </span>
-          <span className="text-[11px] text-zinc-300">{step}</span>
-        </motion.div>
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+      {steps.map((step, i) => (
+        <span key={step} className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />
+          {step}
+        </span>
       ))}
     </div>
   );

@@ -73,36 +73,28 @@ export function ChatMessageBubble({
   }, [content, streaming]);
 
   return (
-    <div className={`flex ${alignment}`}>
+    <div className={`group flex ${alignment}`}>
       <motion.div
-        initial={{ opacity: 0, y: 8 }}
+        initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.25, ease: "easeOut" }}
-        className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm shadow-sm backdrop-blur-md ${
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
           isUser
-            ? "bg-sky-600/90 text-white shadow-sky-900/40"
-            : "bg-zinc-900/80 text-zinc-50 border border-zinc-700/80 shadow-black/40"
+            ? "bg-blue-600/90 text-white"
+            : "bg-zinc-800/60 text-zinc-100 border border-zinc-700/40"
         } ${rtl ? "text-right" : "text-left"}`}
       >
-        <div className="mb-1 flex items-center justify-between gap-2 text-[11px] opacity-75">
-          <span className="font-medium">
-            {isUser
-              ? locale === "ar"
-                ? "أنت"
-                : "You"
-              : locale === "ar"
-              ? "المساعد"
-              : "Assistant"}
-          </span>
+        <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-zinc-400">
+          <span>{isUser ? (locale === "ar" ? "أنت" : "You") : (locale === "ar" ? "المساعد" : "Assistant")}</span>
           <span>{timeStr}</span>
         </div>
         <div className="whitespace-pre-wrap text-[13px] leading-relaxed">
           {displayedContent}
           {streaming && (
-            <span className="ml-1 inline-flex items-center">
-              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-300" />
-              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-400 [animation-delay:120ms]" />
-              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-500 [animation-delay:240ms]" />
+            <span className="ml-1 inline-flex">
+              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-400" />
+              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-500 [animation-delay:150ms]" />
+              <span className="mx-0.5 h-1 w-1 animate-pulse rounded-full bg-zinc-600 [animation-delay:300ms]" />
             </span>
           )}
         </div>
@@ -110,7 +102,7 @@ export function ChatMessageBubble({
           <ExpandableSources sources={sources} locale={locale} rtl={rtl} />
         )}
         {actions && (
-          <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-zinc-700/60 pt-1.5 text-[11px] text-zinc-400">
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-zinc-700/40 pt-1.5 text-[10px] text-zinc-500 opacity-70 transition-opacity group-hover:opacity-100">
             {actions}
           </div>
         )}
@@ -131,36 +123,21 @@ function ExpandableSources({
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="mt-2 space-y-1.5">
+    <div className="mt-1.5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center justify-between rounded-md bg-zinc-900/60 px-2 py-1 text-[11px] font-medium text-zinc-300 transition hover:bg-zinc-800/80 ${
+        className={`flex w-full items-center justify-between rounded px-1.5 py-0.5 text-[10px] text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-400 ${
           rtl ? "text-right" : "text-left"
         }`}
       >
-        <span>
-          {locale === "ar" ? "المصادر" : "Sources"} • {sources.length}
-        </span>
-        <span className="text-[10px] text-zinc-500">
-          {open
-            ? locale === "ar"
-              ? "إخفاء"
-              : "Hide"
-            : locale === "ar"
-            ? "عرض"
-            : "Show"}
-        </span>
+        <span>{locale === "ar" ? "المصادر" : "Sources"} ({sources.length})</span>
+        <span>{open ? "−" : "+"}</span>
       </button>
       {open && (
-        <div className="space-y-1.5">
+        <div className="mt-1 space-y-1">
           {sources.map((s) => (
-            <SourceChunkCard
-              key={s.id}
-              source={s}
-              locale={locale}
-              rtl={rtl}
-            />
+            <SourceChunkCard key={s.id} source={s} locale={locale} rtl={rtl} />
           ))}
         </div>
       )}
