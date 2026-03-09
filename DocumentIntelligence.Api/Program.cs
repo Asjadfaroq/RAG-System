@@ -6,6 +6,8 @@ using DocumentIntelligence.Api;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Polly;
+using Polly.Extensions.Http;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -84,7 +86,15 @@ builder.Services.AddAuthorization(options =>
 var connectionString = builder.Configuration.GetConnectionString("Default");
 
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString, npgsql => npgsql.UseVector()));
+    options.UseNpgsql(connectionString, npgsql =>
+    {
+        npgsql.UseVector();
+        // Enable built-in transient failure retries for PostgreSQL
+        npgsql.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorCodesToAdd: null);
+    }));
 
 builder.Services.AddDocumentIntelligenceCaching(builder.Configuration);
 builder.Services.AddScoped<IWorkspaceAccessService, WorkspaceAccessService>();
@@ -96,8 +106,10 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 if (string.IsNullOrWhiteSpace(builder.Configuration.GetRedisConnectionString()))
     builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<IStorageService, SupabaseStorageService>();
-builder.Services.AddHttpClient<IEmbeddingService, HuggingFaceEmbeddingService>();
-builder.Services.AddHttpClient<ILLMClient, HuggingFaceLLMClient>();
+builder.Services.AddHttpClient<IEmbeddingService, HuggingFaceEmbeddingService>()
+    .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-embedding"));
+builder.Services.AddHttpClient<ILLMClient, HuggingFaceLLMClient>()
+    .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-llm"));
 builder.Services.AddSingleton<IIngestionQueue, InMemoryIngestionQueue>();
 builder.Services.AddHostedService<DocumentIngestionWorker>();
 
