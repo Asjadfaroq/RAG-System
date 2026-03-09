@@ -430,6 +430,7 @@ export default function Home() {
     }
 
     setBusyAsk(true);
+    setQuestion("");
     setStreamingChatId(null);
     setStatus(
       locale === "ar" ? "جاري تنفيذ استعلام RAG..." : "Running RAG query...",
@@ -479,7 +480,6 @@ export default function Home() {
         return [...prev, next];
       });
       setStreamingChatId(id);
-      setQuestion("");
       const msg =
         locale === "ar" ? "تم استلام الإجابة." : "Answer received.";
       setStatus(msg);
@@ -845,10 +845,11 @@ export default function Home() {
                       </button>
                       <textarea
                         ref={questionTextAreaRef}
-                        className="min-h-[24px] max-h-32 flex-1 resize-none bg-transparent text-[14px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none"
+                        className="min-h-[24px] max-h-32 flex-1 resize-none bg-transparent text-[14px] text-zinc-100 placeholder:text-zinc-500 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
                         placeholder={locale === "ar" ? "اكتب سؤالك هنا..." : "Type your question here..."}
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}
+                        disabled={busyAsk}
                       />
                       <div className="relative flex flex-shrink-0 items-center gap-1">
                         <button
@@ -1018,10 +1019,11 @@ export default function Home() {
                 </button>
                 <textarea
                   ref={questionTextAreaRef}
-                  className="min-h-[36px] max-h-24 flex-1 resize-none rounded-xl border border-zinc-600/40 bg-zinc-800/50 px-3 py-2 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors"
+                  className="min-h-[36px] max-h-24 flex-1 resize-none rounded-xl border border-zinc-600/40 bg-zinc-800/50 px-3 py-2 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                   placeholder={locale === "ar" ? "اسأل عن مستنداتك..." : "Ask about your documents..."}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
+                  disabled={busyAsk}
                 />
                 <div className="relative flex flex-shrink-0 items-center gap-1">
                   <button
@@ -1101,19 +1103,64 @@ export default function Home() {
 }
 
 function ThinkingSteps({ locale }: { locale: "en" | "ar" }) {
+  const [activeStep, setActiveStep] = useState(0);
   const steps =
     locale === "ar"
-      ? ["قراءة المستندات...", "البحث في المتجهات...", "توليد الإجابة..."]
-      : ["Reading documents...", "Searching vectors...", "Generating..."];
+      ? ["قراءة المستندات", "البحث في المتجهات", "توليد الإجابة"]
+      : ["Reading documents", "Searching vectors", "Generating"];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setActiveStep((s) => (s + 1) % steps.length);
+    }, 1200);
+    return () => clearInterval(interval);
+  }, [steps.length]);
 
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
-      {steps.map((step, i) => (
-        <span key={step} className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400/80" />
-          {step}
-        </span>
-      ))}
+    <div className="flex items-center gap-2.5">
+      {/* Radar sweep - compact scan indicator */}
+      <svg
+        className="h-4 w-4 shrink-0 text-indigo-400/90"
+        viewBox="0 0 16 16"
+        fill="none"
+      >
+        <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" opacity="0.3" />
+        <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1" opacity="0.2" />
+        <path
+          d="M8 2 L8 8 L12 8"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          className="origin-[8px_8px] animate-radar-sweep"
+        />
+      </svg>
+      {/* Data stream bars - subtle processing indicator */}
+      <div className="flex items-end gap-0.5">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <motion.span
+            key={i}
+            className="w-0.5 rounded-full bg-indigo-500/70"
+            animate={{
+              height: [4, 10, 4],
+            }}
+            transition={{
+              duration: 0.8,
+              repeat: Infinity,
+              delay: i * 0.15,
+            }}
+          />
+        ))}
+      </div>
+      {/* Active step text */}
+      <motion.span
+        key={activeStep}
+        initial={{ opacity: 0, y: 2 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.2 }}
+        className="min-w-0 truncate text-[11px] font-medium tabular-nums text-zinc-400"
+      >
+        {steps[activeStep]}…
+      </motion.span>
     </div>
   );
 }
