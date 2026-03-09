@@ -147,11 +147,9 @@ export default function TeamPage() {
     }
     const data = Array.isArray(body) ? (body as Workspace[]) : [];
     setWorkspaces(data);
-    if (data.length > 0) {
-      setWorkspaceId((prev) => prev || data[0].id);
-    } else {
-      setWorkspaceId("");
-    }
+    setWorkspaceId((prev) =>
+      data.length === 0 ? "" : (data.some((w) => w.id === prev) ? prev : data[0].id)
+    );
   }
 
   async function loadTenants(initialTenantId?: string) {
@@ -309,16 +307,26 @@ export default function TeamPage() {
 
   async function handleDeleteWorkspace() {
     if (!deleteWorkspaceId) return;
+    await refreshSession();
     const res = await fetch(`${getApiBase()}/workspaces/${deleteWorkspaceId}?confirm=true`, {
       method: "DELETE",
       credentials: "include",
     });
     if (res.status === 403) throw new Error("Only the Owner can delete workspaces.");
-    if (res.status === 404) throw new Error("Workspace not found.");
+    if (res.status === 404) {
+      const body = await readResponseBody(res);
+      const debug = typeof body === "object" && body && "_debug" in body ? (body as { _debug?: { workspaceId: string; tenantId: string } })._debug : undefined;
+      if (debug && typeof console !== "undefined") console.warn("Workspace delete 404:", debug);
+      setDeleteWorkspaceId(null);
+      await loadWorkspaces();
+      showToast(debug ? "Workspace not found. Check console and backend logs for tenant ID." : "Workspace may have been removed. List refreshed.", debug ? "error" : "info");
+      return;
+    }
     if (!res.ok) {
       const body = await readResponseBody(res);
       throw new Error(typeof body === "object" && body && "error" in body ? String((body as { error: string }).error) : formatError(res.status, body));
     }
+    setDeleteWorkspaceId(null);
     showToast("Workspace deleted.", "success");
     await loadWorkspaces();
     if (workspaceId === deleteWorkspaceId) {

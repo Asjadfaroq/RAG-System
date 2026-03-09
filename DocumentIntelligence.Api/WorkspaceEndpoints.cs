@@ -40,6 +40,7 @@ public static class WorkspaceEndpoints
             Guid workspaceId,
             ClaimsPrincipal user,
             IWorkspaceDeleteService deleteService,
+            IWebHostEnvironment env,
             bool confirm,
             CancellationToken ct) =>
         {
@@ -52,7 +53,13 @@ public static class WorkspaceEndpoints
                 await deleteService.DeleteWorkspaceAsync(workspaceId, tenantId.Value, ct);
                 return Results.NoContent();
             }
-            catch (InvalidOperationException ex) { return Results.NotFound(new { error = ex.Message }); }
+            catch (InvalidOperationException ex)
+            {
+                var payload = new Dictionary<string, object?> { ["error"] = ex.Message };
+                if (env.IsDevelopment())
+                    payload["_debug"] = new { workspaceId, tenantId = tenantId.Value.ToString() };
+                return Results.NotFound(payload);
+            }
         })
         .RequireAuthorization("OwnerOnly");
 
