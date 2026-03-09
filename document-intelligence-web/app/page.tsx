@@ -359,225 +359,259 @@ export default function Home() {
 
   if (!authChecked || !isLoggedIn) {
     return (
-      <main className="flex min-h-screen items-center justify-center p-6">
+      <main className="flex min-h-screen items-center justify-center bg-black p-6">
         <p className="text-zinc-400">Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-6">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-2xl font-semibold">Document Intelligence Q&A</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/team"
-            className="rounded border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700"
-          >
-            Team
-          </Link>
-          {canCreateWorkspace && (
-            <a
-              href="/admin"
-              className="rounded border border-zinc-600 bg-zinc-800 px-3 py-2 text-sm font-medium hover:bg-zinc-700"
+    <main className="min-h-screen bg-black text-zinc-50">
+      <div className="flex min-h-screen w-full">
+        {/* Sidebar */}
+        <aside className="hidden w-64 flex-col border-r border-zinc-800 bg-zinc-950 p-4 md:flex">
+          <div className="mb-6">
+            <h1 className="text-lg font-semibold">Document Intelligence</h1>
+            <p className="mt-1 text-xs text-zinc-500">
+              {email} &middot; {role}
+            </p>
+          </div>
+
+          <div className="mb-4 space-y-2">
+            <p className="text-xs font-semibold uppercase text-zinc-500">Tenant</p>
+            <select
+              className="w-full rounded border border-zinc-700 bg-transparent p-2 text-sm"
+              value={activeTenantId}
+              onChange={(e) => handleSwitchTenant(e.target.value)}
+              disabled={tenants.length === 0}
             >
-              Admin Dashboard
-            </a>
-          )}
-          {isLoggedIn && (
+              <option value="">Select tenant</option>
+              {tenants.map((t) => (
+                <option key={t.tenantId} value={t.tenantId}>
+                  {t.tenantName} ({t.role})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="mb-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase text-zinc-500">Workspaces</p>
+              <button
+                type="button"
+                className="text-xs text-zinc-400 hover:text-zinc-200"
+                onClick={handleRefreshWorkspaces}
+              >
+                Refresh
+              </button>
+            </div>
+            <select
+              className="w-full rounded border border-zinc-700 bg-transparent p-2 text-sm"
+              value={workspaceId}
+              onChange={(e) => setWorkspaceId(e.target.value)}
+              disabled={workspaces.length === 0}
+            >
+              <option value="">Select workspace</option>
+              {workspaces.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            {canCreateWorkspace && (
+              <button
+                type="button"
+                className="mt-1 w-full rounded bg-indigo-600 px-3 py-2 text-xs font-medium text-white hover:bg-indigo-700"
+                onClick={() => setShowCreateWorkspaceModal(true)}
+              >
+                New workspace
+              </button>
+            )}
+          </div>
+
+          <nav className="mb-4 space-y-1 text-sm">
+            <Link
+              href="/"
+              className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
+            >
+              Dashboard
+            </Link>
+            <Link
+              href="/team"
+              className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
+            >
+              Team
+            </Link>
+            {canCreateWorkspace && (
+              <a
+                href="/admin"
+                className="block rounded px-3 py-2 text-zinc-200 hover:bg-zinc-800"
+              >
+                Admin
+              </a>
+            )}
+          </nav>
+
+          <div className="mt-auto space-y-2 text-sm">
+            <p className="text-xs font-semibold uppercase text-zinc-500">Session</p>
             <button
               type="button"
               onClick={handleLogout}
-              className="rounded border border-zinc-600 px-3 py-2 text-sm hover:bg-zinc-800"
+              className="w-full rounded border border-zinc-700 px-3 py-2 text-left text-zinc-200 hover:bg-zinc-800"
             >
               Logout
             </button>
-          )}
+            {status && (
+              <p className="text-xs text-zinc-500 line-clamp-3">{status}</p>
+            )}
+          </div>
+        </aside>
+
+        {/* Main content */}
+        <div className="flex-1 p-4 md:p-6">
+          <header className="mb-4 flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Q&A Workspace</h2>
+              <p className="mt-1 text-xs text-zinc-500">
+                Upload PDFs and ask focused questions.
+              </p>
+            </div>
+          </header>
+
+          <CreateWorkspaceModal
+            open={showCreateWorkspaceModal}
+            onClose={() => setShowCreateWorkspaceModal(false)}
+            onSubmit={handleCreateWorkspaceSubmit}
+          />
+
+          <section className="mb-4 rounded border border-zinc-700 bg-zinc-950/40 p-4">
+            <h3 className="mb-2 text-sm font-medium text-zinc-200">Upload document</h3>
+            <form className="grid gap-3 md:grid-cols-[1.6fr,1fr,auto]" onSubmit={handleUpload}>
+              <input
+                type="file"
+                accept="application/pdf"
+                className="rounded border border-zinc-700 bg-transparent p-2 text-sm"
+                onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
+              />
+              <input
+                className="rounded border border-zinc-700 bg-transparent p-2 text-sm"
+                placeholder="Language (optional: en/ar)"
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+              />
+              <button
+                className="rounded bg-blue-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                disabled={busyUpload || !isLoggedIn || !workspaceId || !uploadFile}
+                type="submit"
+              >
+                {busyUpload ? "Uploading..." : "Upload"}
+              </button>
+            </form>
+          </section>
+
+          <section className="mb-4 rounded border border-zinc-700 bg-zinc-950/40 p-4">
+            <div className="mb-3 flex flex-wrap items-center gap-3">
+              <h3 className="text-sm font-medium text-zinc-200">Ask questions</h3>
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <label>Mode</label>
+                <select
+                  className="rounded border border-zinc-700 bg-transparent p-1 text-xs"
+                  value={mode}
+                  onChange={(e) => setMode(e.target.value as "vector" | "hybrid")}
+                >
+                  <option value="vector">vector</option>
+                  <option value="hybrid">hybrid</option>
+                </select>
+                <label>TopK</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  className="w-16 rounded border border-zinc-700 bg-transparent p-1 text-xs"
+                  value={topK}
+                  onChange={(e) => setTopK(Number(e.target.value))}
+                />
+                <label>Answer in</label>
+                <select
+                  className="rounded border border-zinc-700 bg-transparent p-1 text-xs"
+                  value={answerLanguage}
+                  onChange={(e) => setAnswerLanguage(e.target.value as AnswerLanguagePreference)}
+                  title="Force answer language (Auto = follow question/content)"
+                >
+                  <option value="auto">Auto</option>
+                  <option value="en">English</option>
+                  <option value="ar">Arabic</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mb-3 flex flex-wrap gap-2">
+              {quickQuestions.map((q) => (
+                <button
+                  key={q}
+                  className="rounded border border-zinc-700 px-3 py-1 text-xs hover:bg-zinc-800"
+                  onClick={() => ask(q)}
+                  type="button"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+
+            <form
+              className="flex flex-col gap-2 md:flex-row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void ask(question);
+              }}
+            >
+              <input
+                className="flex-1 rounded border border-zinc-700 bg-transparent p-2 text-sm"
+                placeholder="Ask factual questions from the uploaded PDF..."
+                value={question}
+                onChange={(e) => setQuestion(e.target.value)}
+              />
+              <button
+                className="rounded bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                disabled={busyAsk || !isLoggedIn || !workspaceId || !question.trim()}
+                type="submit"
+              >
+                {busyAsk ? "Asking..." : "Ask"}
+              </button>
+            </form>
+          </section>
+
+          <section className="space-y-3 pb-10">
+            {chat.map((item) => {
+              const answerDir = resolveAnswerDir(item.answerLanguage ?? "auto", item.answer);
+              return (
+                <article
+                  key={item.id}
+                  className="rounded border border-zinc-700 bg-zinc-950/60 p-4"
+                  dir={answerDir}
+                >
+                  <p className="mb-1 text-xs text-zinc-500">mode={item.mode}</p>
+                  <p className="font-medium">Q: {item.question}</p>
+                  <p className="mt-2 whitespace-pre-wrap text-sm" dir={answerDir}>
+                    A: {item.answer}
+                  </p>
+                  <div className="mt-3" dir="ltr">
+                    <p className="mb-1 text-xs font-medium text-zinc-400">Sources</p>
+                    <ul className="space-y-1 text-xs text-zinc-300">
+                      {item.sources.length === 0 && <li>No sources returned.</li>}
+                      {item.sources.map((src) => (
+                        <li key={src.id} className="rounded bg-zinc-900 p-2">
+                          {src.fileName} - {src.id}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </article>
+              );
+            })}
+          </section>
         </div>
       </div>
-
-      <section className="grid gap-3 rounded border border-zinc-700 p-4 md:grid-cols-2">
-        <p className="text-sm text-zinc-400">
-          Logged in as {email} ({role})
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            value={activeTenantId}
-            onChange={(e) => handleSwitchTenant(e.target.value)}
-            disabled={tenants.length === 0}
-          >
-            <option value="">Select tenant</option>
-            {tenants.map((t) => (
-              <option key={t.tenantId} value={t.tenantId}>
-                {t.tenantName} ({t.role})
-              </option>
-            ))}
-          </select>
-          <select
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            value={workspaceId}
-            onChange={(e) => setWorkspaceId(e.target.value)}
-            disabled={workspaces.length === 0}
-          >
-            <option value="">Select workspace</option>
-            {workspaces.map((w) => (
-              <option key={w.id} value={w.id}>
-                {w.name} ({w.id.slice(0, 8)}...)
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="rounded border border-zinc-600 p-2 text-sm hover:bg-zinc-800"
-            onClick={handleRefreshWorkspaces}
-          >
-            Refresh Workspaces
-          </button>
-          {canCreateWorkspace && (
-            <button
-              type="button"
-              className="rounded bg-indigo-600 px-3 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              onClick={() => setShowCreateWorkspaceModal(true)}
-            >
-              Create workspace
-            </button>
-          )}
-        </div>
-      </section>
-
-      <CreateWorkspaceModal
-        open={showCreateWorkspaceModal}
-        onClose={() => setShowCreateWorkspaceModal(false)}
-        onSubmit={handleCreateWorkspaceSubmit}
-      />
-
-      <section className="rounded border border-zinc-700 p-4">
-        <h2 className="mb-2 text-lg font-medium">1) Re-upload PDF</h2>
-        <form className="grid gap-3 md:grid-cols-4" onSubmit={handleUpload}>
-          <input
-            type="file"
-            accept="application/pdf"
-            className="rounded border border-zinc-600 bg-transparent p-2 md:col-span-2"
-            onChange={(e) => setUploadFile(e.target.files?.[0] ?? null)}
-          />
-          <input
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            placeholder="Language (optional: en/ar)"
-            value={language}
-            onChange={(e) => setLanguage(e.target.value)}
-          />
-          <button
-            className="rounded bg-blue-600 p-2 font-medium text-white disabled:opacity-60"
-            disabled={busyUpload || !isLoggedIn || !workspaceId || !uploadFile}
-            type="submit"
-          >
-            {busyUpload ? "Uploading..." : "Upload"}
-          </button>
-        </form>
-      </section>
-
-      <section className="rounded border border-zinc-700 p-4">
-        <h2 className="mb-2 text-lg font-medium">2) Ask Questions</h2>
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <label className="text-sm">Mode:</label>
-          <select
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            value={mode}
-            onChange={(e) => setMode(e.target.value as "vector" | "hybrid")}
-          >
-            <option value="vector">vector</option>
-            <option value="hybrid">hybrid</option>
-          </select>
-          <label className="ml-2 text-sm">TopK:</label>
-          <input
-            type="number"
-            min={1}
-            max={10}
-            className="w-24 rounded border border-zinc-600 bg-transparent p-2"
-            value={topK}
-            onChange={(e) => setTopK(Number(e.target.value))}
-          />
-          <label className="ml-2 text-sm">Answer in:</label>
-          <select
-            className="rounded border border-zinc-600 bg-transparent p-2"
-            value={answerLanguage}
-            onChange={(e) => setAnswerLanguage(e.target.value as AnswerLanguagePreference)}
-            title="Force answer language (Auto = follow question/content)"
-          >
-            <option value="auto">Auto</option>
-            <option value="en">English</option>
-            <option value="ar">Arabic</option>
-          </select>
-        </div>
-
-        <div className="mb-2 flex flex-wrap gap-2">
-          {quickQuestions.map((q) => (
-            <button
-              key={q}
-              className="rounded border border-zinc-600 px-3 py-1 text-sm hover:bg-zinc-800"
-              onClick={() => ask(q)}
-              type="button"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-
-        <form
-          className="flex flex-col gap-2 md:flex-row"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void ask(question);
-          }}
-        >
-          <input
-            className="flex-1 rounded border border-zinc-600 bg-transparent p-2"
-            placeholder="Ask factual questions from the uploaded PDF..."
-            value={question}
-            onChange={(e) => setQuestion(e.target.value)}
-          />
-          <button
-            className="rounded bg-emerald-600 px-4 py-2 font-medium text-white disabled:opacity-60"
-            disabled={busyAsk || !isLoggedIn || !workspaceId || !question.trim()}
-            type="submit"
-          >
-            {busyAsk ? "Asking..." : "Ask"}
-          </button>
-        </form>
-      </section>
-
-      <p className="text-sm text-zinc-400">{status}</p>
-
-      <section className="space-y-3 pb-10">
-        {chat.map((item) => {
-          const answerDir = resolveAnswerDir(item.answerLanguage ?? "auto", item.answer);
-          return (
-            <article
-              key={item.id}
-              className="rounded border border-zinc-700 p-4"
-              dir={answerDir}
-            >
-              <p className="text-sm text-zinc-400">mode={item.mode}</p>
-              <p className="font-medium">Q: {item.question}</p>
-              <p className="mt-2 whitespace-pre-wrap" dir={answerDir}>
-                A: {item.answer}
-              </p>
-              <div className="mt-3" dir="ltr">
-                <p className="mb-1 text-sm font-medium">Sources</p>
-                <ul className="space-y-1 text-sm text-zinc-300">
-                  {item.sources.length === 0 && <li>No sources returned.</li>}
-                  {item.sources.map((src) => (
-                    <li key={src.id} className="rounded bg-zinc-900 p-2">
-                      {src.fileName} - {src.id}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </article>
-          );
-        })}
-      </section>
     </main>
   );
 }
