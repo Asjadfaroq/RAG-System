@@ -78,10 +78,10 @@ export function ChatMessageBubble({
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
-        className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
+        className={`max-w-[85%] rounded-xl px-3 py-2.5 text-sm shadow-lg ${
           isUser
-            ? "bg-blue-600/90 text-white"
-            : "bg-zinc-800/60 text-zinc-100 border border-zinc-700/40"
+            ? "bg-indigo-500/95 text-white shadow-indigo-900/30"
+            : "bg-zinc-800/70 text-zinc-100 shadow-black/20 backdrop-blur-sm border border-zinc-700/30"
         } ${rtl ? "text-right" : "text-left"}`}
       >
         <div className="mb-1 flex items-center justify-between gap-2 text-[10px] text-zinc-400">

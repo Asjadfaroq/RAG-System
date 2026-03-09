@@ -455,11 +455,11 @@ export default function Home() {
   }
 
   return (
-    <main className="h-screen bg-gradient-to-b from-[#050816] via-black to-black text-zinc-50" dir={dir}>
+    <main className="app-dark-bg app-grid h-screen text-zinc-50" dir={dir}>
       <div className="flex h-screen w-full overflow-hidden">
         {/* Sidebar */}
-        <aside className="hidden w-56 flex-shrink-0 flex-col border-r border-zinc-800/50 bg-zinc-950/50 p-3 md:flex">
-          <h1 className="mb-4 text-sm font-semibold text-zinc-100">
+        <aside className="glass-surface hidden w-56 flex-shrink-0 flex-col border-r border-zinc-800/40 p-3 md:flex">
+          <h1 className="mb-4 text-sm font-semibold tracking-tight text-zinc-100">
             {locale === "ar" ? "الذكاء المستندي" : "Doc Intelligence"}
           </h1>
 
@@ -552,14 +552,14 @@ export default function Home() {
 
         {/* Main content */}
         <div className="flex min-h-0 flex-1 flex-col p-3 md:p-4">
-          <header className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-medium text-zinc-100">
+          <header className="mb-3 flex items-center justify-between">
+            <h2 className="text-base font-semibold tracking-tight text-zinc-100">
               {locale === "ar" ? "المحادثة" : "Chat"}
             </h2>
             <button
               type="button"
               onClick={toggleLocale}
-              className="rounded px-2 py-1 text-[11px] text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-200"
+              className="rounded-lg border border-zinc-700/40 bg-zinc-800/30 px-2.5 py-1 text-[11px] text-zinc-400 transition-colors hover:border-zinc-600 hover:bg-zinc-700/40 hover:text-zinc-200"
             >
               {locale === "ar" ? "EN" : "العربية"}
             </button>
@@ -571,7 +571,7 @@ export default function Home() {
             onSubmit={handleCreateWorkspaceSubmit}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-xl border border-zinc-800/40 bg-zinc-950/30">
+          <section className="glass-surface flex min-h-0 flex-1 flex-col rounded-2xl border border-zinc-700/30 shadow-xl shadow-black/20">
             {/* Compact upload bar */}
             <form
               onSubmit={handleUpload}
@@ -583,8 +583,8 @@ export default function Home() {
                 const file = e.dataTransfer.files?.[0];
                 if (file?.type === "application/pdf") setUploadFile(file);
               }}
-              className={`flex items-center gap-2 border-b border-zinc-800/40 px-3 py-2 ${
-                dragActive ? "bg-zinc-800/30" : ""
+              className={`flex items-center gap-2 border-b border-zinc-700/30 px-3 py-2.5 transition-colors ${
+                dragActive ? "bg-indigo-500/5" : ""
               }`}
             >
               <input
@@ -596,7 +596,7 @@ export default function Home() {
               />
               <label
                 htmlFor="pdf-upload-input"
-                className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700/50 bg-zinc-900/50 px-2 py-1.5 text-[11px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-600/40 bg-zinc-800/40 px-2.5 py-1.5 text-[11px] text-zinc-400 transition-colors hover:border-zinc-500 hover:bg-zinc-700/40 hover:text-zinc-200"
               >
                 <span>📄</span>
                 {uploadFile ? (
@@ -623,7 +623,7 @@ export default function Home() {
               <button
                 type="submit"
                 disabled={busyUpload || !uploadFile}
-                className="ml-auto rounded-lg bg-zinc-700 px-2 py-1.5 text-[11px] font-medium text-zinc-200 hover:bg-zinc-600 disabled:opacity-50"
+                className="ml-auto rounded-lg bg-indigo-600/80 px-2.5 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-50"
               >
                 {busyUpload ? "…" : locale === "ar" ? "رفع" : "Upload"}
               </button>
@@ -640,7 +640,7 @@ export default function Home() {
               {/* Empty state: centered input (ChatGPT-style) */}
               {chat.length === 0 && (
                 <div className="flex flex-1 flex-col items-center justify-center px-4">
-                  <p className="mb-6 text-center text-[15px] font-medium text-zinc-400">
+                  <p className="mb-8 text-center text-[17px] font-medium tracking-tight text-zinc-300">
                     {locale === "ar"
                       ? "اطرح أسئلة حول مستنداتك"
                       : "Ask questions about your documents"}
@@ -652,7 +652,7 @@ export default function Home() {
                       void ask(question);
                     }}
                   >
-                    <div className="flex items-center gap-2 rounded-2xl border border-zinc-700/50 bg-zinc-900/50 px-4 py-3 shadow-sm focus-within:border-zinc-600 focus-within:ring-1 focus-within:ring-zinc-600/30">
+                    <div className="input-glow flex items-center gap-3 rounded-2xl border border-zinc-600/40 bg-zinc-900/60 px-4 py-3.5 shadow-lg transition-all duration-200 focus-within:border-indigo-500/50 focus-within:bg-zinc-900/80">
                       <button
                         type="button"
                         className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
@@ -726,7 +726,7 @@ export default function Home() {
                         <button
                           type="submit"
                           disabled={busyAsk || !workspaceId || !question.trim()}
-                          className="flex h-8 items-center justify-center rounded-lg bg-zinc-100 px-4 text-[12px] font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+                          className="flex h-8 items-center justify-center rounded-lg bg-indigo-500 px-4 text-[12px] font-medium text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-400 disabled:opacity-50"
                         >
                           {busyAsk ? (
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
@@ -810,7 +810,7 @@ export default function Home() {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="mb-2 rounded-lg border border-zinc-700/40 bg-zinc-800/30 px-3 py-2"
+                    className="mb-2 rounded-xl border border-indigo-500/20 bg-indigo-500/5 px-3 py-2.5"
                   >
                     <ThinkingSteps locale={locale === "ar" ? "ar" : "en"} />
                   </motion.div>
@@ -820,7 +820,7 @@ export default function Home() {
               {/* Sticky input (only when chat has messages) */}
               {chat.length > 0 && (
               <form
-                className="mt-auto flex items-end gap-2 border-t border-zinc-800/40 pt-3"
+                className="mt-auto flex items-end gap-2 border-t border-zinc-700/30 bg-zinc-900/20 pt-3"
                 onSubmit={(e) => {
                   e.preventDefault();
                   void ask(question);
@@ -836,7 +836,7 @@ export default function Home() {
                 </button>
                 <textarea
                   ref={questionTextAreaRef}
-                  className="min-h-[36px] max-h-24 flex-1 resize-none rounded-lg border border-zinc-700/50 bg-zinc-900/50 px-3 py-2 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-zinc-600 focus:outline-none"
+                  className="min-h-[36px] max-h-24 flex-1 resize-none rounded-xl border border-zinc-600/40 bg-zinc-800/50 px-3 py-2 text-[13px] text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 transition-colors"
                   placeholder={locale === "ar" ? "اسأل عن مستنداتك..." : "Ask about your documents..."}
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
@@ -899,7 +899,7 @@ export default function Home() {
                   <button
                     type="submit"
                     disabled={busyAsk || !workspaceId || !question.trim()}
-                    className="flex h-8 items-center justify-center rounded-lg bg-zinc-100 px-3 text-[12px] font-medium text-zinc-900 hover:bg-white disabled:opacity-50"
+                    className="flex h-8 items-center justify-center rounded-lg bg-indigo-500 px-3 text-[12px] font-medium text-white shadow-lg shadow-indigo-500/20 transition-all hover:bg-indigo-400 disabled:opacity-50"
                   >
                     {busyAsk ? (
                       <span className="h-3 w-3 animate-spin rounded-full border-2 border-zinc-400 border-t-transparent" />
@@ -925,10 +925,10 @@ function ThinkingSteps({ locale }: { locale: "en" | "ar" }) {
       : ["Reading documents...", "Searching vectors...", "Generating..."];
 
   return (
-    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-500">
+    <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-400">
       {steps.map((step, i) => (
         <span key={step} className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-zinc-500" />
+          <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-indigo-400/80" />
           {step}
         </span>
       ))}
