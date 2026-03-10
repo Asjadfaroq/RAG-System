@@ -24,13 +24,18 @@ interface ToastContextValue {
 
 const ToastContext = createContext<ToastContextValue | undefined>(undefined);
 
+const MAX_TOAST_MESSAGE_LENGTH = 120;
+
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback(
     (message: string, variant: ToastVariant = "info") => {
+      const safeMsg = message.length > MAX_TOAST_MESSAGE_LENGTH
+        ? message.slice(0, MAX_TOAST_MESSAGE_LENGTH).trim() + "…"
+        : message;
       const id = crypto.randomUUID();
-      setToasts((prev) => [...prev, { id, message, variant }]);
+      setToasts((prev) => [...prev, { id, message: safeMsg, variant }]);
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
       }, 4000);

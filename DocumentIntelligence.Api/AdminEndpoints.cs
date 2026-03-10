@@ -39,7 +39,7 @@ public static class AdminEndpoints
                 await deleteService.DeleteTenantAsync(tenantId.Value, ct);
                 return Results.NoContent();
             }
-            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException) { return Results.BadRequest(new { error = "Tenant deletion failed." }); }
         })
         .RequireAuthorization("OwnerOnly");
 

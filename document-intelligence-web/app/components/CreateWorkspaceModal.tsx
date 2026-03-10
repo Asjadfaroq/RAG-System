@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { getUserFriendlyError } from "../lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 
 type Props = {
@@ -41,7 +42,7 @@ export default function CreateWorkspaceModal({ open, onClose, onSubmit }: Props)
         setError("Failed to create workspace.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create workspace.");
+      setError(getUserFriendlyError(err, "Failed to create workspace."));
     } finally {
       setBusy(false);
     }

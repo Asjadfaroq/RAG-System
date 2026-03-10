@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
+import { getUserFriendlyError } from "../lib/api";
 import { AnimatePresence, motion } from "framer-motion";
 
 type Props = {
@@ -44,7 +45,7 @@ export default function ConfirmDeleteModal({
       await onConfirm();
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
+      setError(getUserFriendlyError(err, "Something went wrong."));
     } finally {
       setBusy(false);
     }

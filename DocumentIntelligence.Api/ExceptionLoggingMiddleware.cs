@@ -71,7 +71,7 @@ namespace DocumentIntelligence.Api;
 
         var detail = status == StatusCodes.Status402PaymentRequired
             ? "AI service credits are out of stock. Please try again later or contact your administrator."
-            : (_environment.IsDevelopment() ? exception.ToString() : exception.Message);
+            : (_environment.IsDevelopment() ? exception.ToString() : "An unexpected error occurred. Please try again later.");
 
         var problem = new ProblemDetails
         {

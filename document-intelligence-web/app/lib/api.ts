@@ -14,17 +14,33 @@ export async function readResponseBody(res: Response): Promise<unknown | null> {
   }
 }
 
+const MAX_ERROR_LENGTH = 120;
+
+function sanitizeUserMessage(msg: string): string {
+  if (msg.length <= MAX_ERROR_LENGTH) return msg;
+  return msg.slice(0, MAX_ERROR_LENGTH).trim() + "…";
+}
+
 export function formatError(status: number, body: unknown): string {
-  if (typeof body === "string" && body.trim().length > 0) return body;
-  if (body && typeof body === "object") {
-    // RFC 7807 Problem Details: prefer readable "detail" field
+  let msg = "Something went wrong. Please try again.";
+  if (typeof body === "string" && body.trim().length > 0) {
+    msg = body.trim();
+  } else if (body && typeof body === "object") {
     const obj = body as Record<string, unknown>;
     if (typeof obj.detail === "string" && obj.detail.trim().length > 0)
-      return obj.detail;
-    if (typeof obj.title === "string") return obj.title;
-    return JSON.stringify(body);
+      msg = obj.detail.trim();
+    else if (typeof obj.title === "string" && obj.title.trim().length > 0)
+      msg = obj.title.trim();
+    else if (typeof obj.error === "string" && obj.error.trim().length > 0)
+      msg = obj.error.trim();
   }
-  return `Request failed with status ${status}.`;
+  return sanitizeUserMessage(msg);
+}
+
+/** Safe error message for user display. Truncates long messages. */
+export function getUserFriendlyError(err: unknown, fallback: string): string {
+  const msg = err instanceof Error ? err.message : fallback;
+  return sanitizeUserMessage(msg || fallback);
 }
 
 export const AUTH_KEY = "di_auth";

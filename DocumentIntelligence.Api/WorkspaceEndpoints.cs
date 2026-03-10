@@ -53,9 +53,9 @@ public static class WorkspaceEndpoints
                 await deleteService.DeleteWorkspaceAsync(workspaceId, tenantId.Value, ct);
                 return Results.NoContent();
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
-                var payload = new Dictionary<string, object?> { ["error"] = ex.Message };
+                var payload = new Dictionary<string, object?> { ["error"] = "Workspace not found or access denied." };
                 if (env.IsDevelopment())
                     payload["_debug"] = new { workspaceId, tenantId = tenantId.Value.ToString() };
                 return Results.NotFound(payload);

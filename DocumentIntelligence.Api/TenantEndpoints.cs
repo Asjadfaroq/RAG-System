@@ -68,7 +68,7 @@ public static class TenantEndpoints
             catch (Exception ex)
             {
                 log.LogError(ex, "Invite creation failed (unexpected): TenantId={TenantId}, Email={Email}", tenantId, request.Email);
-                return Results.Json(new { title = "Invite creation failed.", status = 500, detail = ex.Message }, statusCode: 500);
+                return Results.Json(new { title = "Invite creation failed. Please try again.", status = 500 }, statusCode: 500);
             }
         });
 

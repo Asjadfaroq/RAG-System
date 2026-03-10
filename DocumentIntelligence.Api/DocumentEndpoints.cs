@@ -143,9 +143,9 @@ public static class DocumentEndpoints
                 await deleteService.DeleteDocumentAsync(documentId, tenantId.Value, ct);
                 return Results.NoContent();
             }
-            catch (InvalidOperationException ex)
+            catch (InvalidOperationException)
             {
-                return Results.NotFound(new { error = ex.Message });
+                return Results.NotFound(new { error = "Document not found or access denied." });
             }
         });
 
