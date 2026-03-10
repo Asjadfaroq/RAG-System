@@ -10,6 +10,12 @@ import {
   AuthResponse,
 } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
+import AuthLayout from "../components/AuthLayout";
+
+const inputBase =
+  "w-full rounded-xl border border-zinc-600/80 bg-zinc-800/40 pl-10 pr-4 py-3 text-zinc-100 placeholder-zinc-500 transition-all duration-200 focus:border-indigo-500/60 focus:bg-zinc-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
+
+const inputIcon = "absolute left-3 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-zinc-500";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -61,40 +67,81 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="app-dark-bg app-grid mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center gap-6 p-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:p-6">
-      <h1 className="text-2xl font-semibold text-zinc-100">Sign In</h1>
-      <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
-        <input
-          className="rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
-          type="email"
-          placeholder="Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-        />
-        <input
-          className="rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
-          type="password"
-          placeholder="Password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          required
-        />
+    <AuthLayout title="Welcome back" subtitle="Sign in to continue to your workspace">
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
+        <div className="space-y-2">
+          <label htmlFor="email" className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Email
+          </label>
+          <div className="relative">
+            <svg className={inputIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            </svg>
+            <input
+              id="email"
+              className={inputBase}
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="password" className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
+            Password
+          </label>
+          <div className="relative">
+            <svg className={inputIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <input
+              id="password"
+              className={inputBase}
+              type="password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+        </div>
+
+        {status && (
+          <p className="text-sm text-zinc-400" role="status">
+            {status}
+          </p>
+        )}
+
         <button
-          className="rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
+          className="mt-1 rounded-xl bg-indigo-600 px-4 py-3 font-medium text-white shadow-lg shadow-indigo-500/25 transition-all hover:bg-indigo-500 hover:shadow-indigo-500/30 disabled:opacity-60 disabled:hover:bg-indigo-600"
           type="submit"
           disabled={busy}
         >
-          {busy ? "Signing in..." : "Sign In"}
+          {busy ? "Signing in..." : "Sign in"}
         </button>
+
+        <div className="relative my-2">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-zinc-700/60" />
+          </div>
+          <div className="relative flex justify-center text-xs text-zinc-500">
+            <span className="bg-zinc-900/40 px-3">or</span>
+          </div>
+        </div>
+
+        <p className="text-center text-sm text-zinc-400">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/signup"
+            className="font-medium text-indigo-400 underline-offset-2 hover:text-indigo-300 hover:underline"
+          >
+            Create account
+          </Link>
+        </p>
       </form>
-      <p className="text-sm text-zinc-400">{status}</p>
-      <p className="text-sm text-zinc-400">
-        Don&apos;t have an account?{" "}
-        <Link href="/signup" className="text-blue-400 underline hover:no-underline">
-          Create account
-        </Link>
-      </p>
-    </main>
+    </AuthLayout>
   );
 }
