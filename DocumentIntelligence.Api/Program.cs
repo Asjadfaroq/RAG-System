@@ -115,10 +115,35 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 if (string.IsNullOrWhiteSpace(builder.Configuration.GetRedisConnectionString()))
     builder.Services.AddScoped<IRefreshTokenStore, RefreshTokenStore>();
 builder.Services.AddHttpClient<IStorageService, SupabaseStorageService>();
-builder.Services.AddHttpClient<IEmbeddingService, HuggingFaceEmbeddingService>()
-    .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-embedding"));
-builder.Services.AddHttpClient<ILLMClient, HuggingFaceLLMClient>()
-    .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-llm"));
+
+// Embedding provider: huggingface (default for hybrid setup)
+var embeddingProvider = (builder.Configuration["EMBEDDING_PROVIDER"] ?? "huggingface").Trim().ToLowerInvariant();
+if (embeddingProvider == "huggingface")
+{
+    builder.Services.AddHttpClient<IEmbeddingService, HuggingFaceEmbeddingService>()
+        .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-embedding"));
+}
+else
+{
+    throw new InvalidOperationException($"Unknown EMBEDDING_PROVIDER='{embeddingProvider}'. Supported: huggingface.");
+}
+
+// LLM provider: groq (default) | huggingface
+var llmProvider = (builder.Configuration["LLM_PROVIDER"] ?? "groq").Trim().ToLowerInvariant();
+if (llmProvider == "groq")
+{
+    builder.Services.AddHttpClient<ILLMClient, GroqLLMClient>()
+        .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("groq-llm"));
+}
+else if (llmProvider == "huggingface")
+{
+    builder.Services.AddHttpClient<ILLMClient, HuggingFaceLLMClient>()
+        .AddPolicyHandler(HttpClientPolicies.CreateRetryPolicy("hf-llm"));
+}
+else
+{
+    throw new InvalidOperationException($"Unknown LLM_PROVIDER='{llmProvider}'. Supported: groq, huggingface.");
+}
 builder.Services.AddSingleton<IIngestionQueue, InMemoryIngestionQueue>();
 builder.Services.AddHostedService<DocumentIngestionWorker>();
 
@@ -267,7 +292,7 @@ app.MapGet("/health/deep", async (
         }
     }
 
-    // Hugging Face reachability (router base)
+    // Hugging Face reachability (used for embeddings when EMBEDDING_PROVIDER=huggingface)
     var hfApiKey = (config["HUGGINGFACE_API_KEY"] ?? string.Empty).Trim();
     if (string.IsNullOrWhiteSpace(hfApiKey))
     {
@@ -290,6 +315,33 @@ app.MapGet("/health/deep", async (
         catch (Exception ex)
         {
             results["huggingface"] = new { status = "unhealthy", error = ex.Message };
+        }
+    }
+
+    // Groq reachability (used for LLM when LLM_PROVIDER=groq)
+    var groqApiKey = (config["GROQ_API_KEY"] ?? string.Empty).Trim();
+    var llmProvider = (config["LLM_PROVIDER"] ?? "groq").Trim().ToLowerInvariant();
+    if (llmProvider != "groq" || string.IsNullOrWhiteSpace(groqApiKey))
+    {
+        results["groq"] = new { status = "disabled" };
+    }
+    else
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, "https://api.groq.com/openai/v1/models");
+            request.Headers.Authorization =
+                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", groqApiKey);
+            var response = await client.SendAsync(request, ct);
+            results["groq"] = new
+            {
+                status = response.IsSuccessStatusCode ? "healthy" : "degraded",
+                httpStatus = (int)response.StatusCode
+            };
+        }
+        catch (Exception ex)
+        {
+            results["groq"] = new { status = "unhealthy", error = ex.Message };
         }
     }
 
