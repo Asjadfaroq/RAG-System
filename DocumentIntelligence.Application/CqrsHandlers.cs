@@ -7,6 +7,16 @@ using System.Text.Json;
 
 namespace DocumentIntelligence.Application;
 
+internal static class Sha256Hash
+{
+    public static string Compute(string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
+    }
+}
+
 public record RegisterTenantAndOwnerCommand(
     string TenantName,
     string TenantSlug,
@@ -418,7 +428,7 @@ public class GetWorkspacesQueryHandler : IRequestHandler<GetWorkspacesQuery, IRe
     public async Task<IReadOnlyList<WorkspaceDto>> Handle(GetWorkspacesQuery request, CancellationToken cancellationToken)
     {
         var key = $"workspaces:tenant:{request.TenantId:N}";
-        return await _cache.GetOrSetAsync(key, WorkspacesCacheTtl, async ct =>
+        return await _cache.GetOrSetAsync(key, WorkspacesCacheTtl, ct =>
         {
             var list = _db.Workspaces
                 .Where(w => w.TenantId == request.TenantId)
@@ -426,7 +436,7 @@ public class GetWorkspacesQueryHandler : IRequestHandler<GetWorkspacesQuery, IRe
                 .Select(w => new WorkspaceDto(w.Id, w.Name, w.Description, w.CreatedAt))
                 .ToList()
                 .AsReadOnly();
-            return await Task.FromResult(list);
+            return Task.FromResult(list);
         }, cancellationToken);
     }
 }
@@ -478,7 +488,7 @@ public class GetDocumentsQueryHandler : IRequestHandler<GetDocumentsQuery, IRead
     public async Task<IReadOnlyList<DocumentDto>> Handle(GetDocumentsQuery request, CancellationToken cancellationToken)
     {
         var key = $"documents:tenant:{request.TenantId:N}:workspace:{request.WorkspaceId:N}";
-        return await _cache.GetOrSetAsync(key, DocumentsCacheTtl, async ct =>
+        return await _cache.GetOrSetAsync(key, DocumentsCacheTtl, ct =>
         {
             var list = _db.Documents
                 .Where(d => d.TenantId == request.TenantId && d.WorkspaceId == request.WorkspaceId)
@@ -493,7 +503,7 @@ public class GetDocumentsQueryHandler : IRequestHandler<GetDocumentsQuery, IRead
                     d.CreatedAt))
                 .ToList()
                 .AsReadOnly();
-            return await Task.FromResult(list);
+            return Task.FromResult(list);
         }, cancellationToken);
     }
 }
@@ -724,13 +734,6 @@ public class CreateTenantInviteCommandHandler : IRequestHandler<CreateTenantInvi
         _db = db;
     }
 
-    private static string HashCode(string code)
-    {
-        var bytes = Encoding.UTF8.GetBytes(code);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
-    }
-
     public async Task<string> Handle(CreateTenantInviteCommand request, CancellationToken cancellationToken)
     {
         var email = request.Email.Trim().ToLowerInvariant();
@@ -751,7 +754,7 @@ public class CreateTenantInviteCommandHandler : IRequestHandler<CreateTenantInvi
             .Replace("/", string.Empty)
             .Replace("=", string.Empty);
 
-        var codeHash = HashCode(rawCode);
+        var codeHash = Sha256Hash.Compute(rawCode);
 
         var invite = new TenantInvite
         {
@@ -791,20 +794,13 @@ public class AcceptInviteCommandHandler : IRequestHandler<AcceptInviteCommand, A
         _refreshTokenStore = refreshTokenStore;
     }
 
-    private static string HashCode(string code)
-    {
-        var bytes = Encoding.UTF8.GetBytes(code);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
-    }
-
     public async Task<AuthResult> Handle(AcceptInviteCommand request, CancellationToken cancellationToken)
     {
         var code = request.Code.Trim();
         if (string.IsNullOrWhiteSpace(code))
             throw new UnauthorizedAccessException("Invalid invite code.");
 
-        var inviteHash = HashCode(code);
+        var inviteHash = Sha256Hash.Compute(code);
         var invite = _db.TenantInvites.FirstOrDefault(i => i.Code == inviteHash);
         if (invite is null || invite.IsUsed || invite.ExpiresAt <= DateTime.UtcNow)
             throw new UnauthorizedAccessException("Invite is invalid or expired.");

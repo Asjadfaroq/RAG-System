@@ -286,28 +286,13 @@ public class RefreshTokenStore : IRefreshTokenStore
         _configuration = configuration;
     }
 
-    private static string HashToken(string token)
-    {
-        var bytes = Encoding.UTF8.GetBytes(token);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
-    }
-
-    private int GetRefreshTokenExpirationDays()
-    {
-        var config = _configuration["Jwt:RefreshTokenExpirationDays"] ?? _configuration["Jwt__RefreshTokenExpirationDays"];
-        if (!string.IsNullOrWhiteSpace(config) && int.TryParse(config, out var days) && days > 0)
-            return Math.Min(days, 30);
-        return 7;
-    }
-
     public async Task<(string Token, DateTime ExpiresAtUtc)> CreateAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var bytes = new byte[48];
         RandomNumberGenerator.Fill(bytes);
         var token = Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
-        var hash = HashToken(token);
-        var expiresAt = DateTime.UtcNow.AddDays(GetRefreshTokenExpirationDays());
+        var hash = TokenHashing.Hash(token);
+        var expiresAt = DateTime.UtcNow.AddDays(RefreshTokenConfig.GetExpirationDays(_configuration));
 
         var entity = new RefreshToken
         {
@@ -325,7 +310,7 @@ public class RefreshTokenStore : IRefreshTokenStore
     public async Task<User?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var hash = HashToken(token);
+        var hash = TokenHashing.Hash(token);
         var refreshToken = await _db.RefreshTokens
             .Where(rt => rt.TokenHash == hash && rt.ExpiresAtUtc > DateTime.UtcNow)
             .Include(rt => rt.User)
@@ -337,7 +322,7 @@ public class RefreshTokenStore : IRefreshTokenStore
     public async Task RevokeAsync(string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token)) return;
-        var hash = HashToken(token);
+        var hash = TokenHashing.Hash(token);
         var existing = await _db.RefreshTokens
             .Where(rt => rt.TokenHash == hash)
             .ToListAsync(cancellationToken);
@@ -361,28 +346,13 @@ public sealed class RedisRefreshTokenStore : IRefreshTokenStore
         _configuration = configuration;
     }
 
-    private static string HashToken(string token)
-    {
-        var bytes = Encoding.UTF8.GetBytes(token);
-        var hash = SHA256.HashData(bytes);
-        return Convert.ToHexString(hash);
-    }
-
-    private int GetRefreshTokenExpirationDays()
-    {
-        var config = _configuration["Jwt:RefreshTokenExpirationDays"] ?? _configuration["Jwt__RefreshTokenExpirationDays"];
-        if (!string.IsNullOrWhiteSpace(config) && int.TryParse(config, out var days) && days > 0)
-            return Math.Min(days, 30);
-        return 7;
-    }
-
     public Task<(string Token, DateTime ExpiresAtUtc)> CreateAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         var bytes = new byte[48];
         RandomNumberGenerator.Fill(bytes);
         var token = Convert.ToBase64String(bytes).Replace("+", "-").Replace("/", "_").TrimEnd('=');
-        var hash = HashToken(token);
-        var days = GetRefreshTokenExpirationDays();
+        var hash = TokenHashing.Hash(token);
+        var days = RefreshTokenConfig.GetExpirationDays(_configuration);
         var expiresAt = DateTime.UtcNow.AddDays(days);
         var ttl = TimeSpan.FromDays(days);
         var key = KeyPrefix + hash;
@@ -394,7 +364,7 @@ public sealed class RedisRefreshTokenStore : IRefreshTokenStore
     public async Task<User?> GetUserByTokenAsync(string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token)) return null;
-        var hash = HashToken(token);
+        var hash = TokenHashing.Hash(token);
         var key = KeyPrefix + hash;
         var redisDb = _redis.GetDatabase();
         var userIdStr = await redisDb.StringGetAsync(key);
@@ -409,7 +379,7 @@ public sealed class RedisRefreshTokenStore : IRefreshTokenStore
     public Task RevokeAsync(string token, CancellationToken cancellationToken = default)
     {
         if (string.IsNullOrWhiteSpace(token)) return Task.CompletedTask;
-        var hash = HashToken(token);
+        var hash = TokenHashing.Hash(token);
         var key = KeyPrefix + hash;
         var redisDb = _redis.GetDatabase();
         return redisDb.KeyDeleteAsync(key);
@@ -541,13 +511,7 @@ public class HuggingFaceEmbeddingService : IEmbeddingService
 
         if (!response.IsSuccessStatusCode)
         {
-            if (response.StatusCode == System.Net.HttpStatusCode.PaymentRequired ||
-                json.Contains("depleted your monthly", StringComparison.OrdinalIgnoreCase) ||
-                (json.Contains("depleted", StringComparison.OrdinalIgnoreCase) && json.Contains("credits", StringComparison.OrdinalIgnoreCase)))
-            {
-                throw new InvalidOperationException(
-                    "HUGGINGFACE_CREDITS_EXHAUSTED: AI service credits are out of stock. Please try again later or contact your administrator.");
-            }
+            HuggingFaceErrorHandler.ThrowIfCreditsExhausted(response.StatusCode, json);
             throw new InvalidOperationException(
                 $"HuggingFace embedding error ({response.StatusCode}): {json}");
         }
@@ -583,7 +547,7 @@ public class HuggingFaceLLMClient : ILLMClient
         var apiKey = ConfigHelpers.Sanitize(_configuration["HUGGINGFACE_API_KEY"] ?? throw new InvalidOperationException("HUGGINGFACE_API_KEY not set."));
         var model = ConfigHelpers.Sanitize(_configuration["HUGGINGFACE_LLM_MODEL"] ?? throw new InvalidOperationException("HUGGINGFACE_LLM_MODEL not set."));
 
-        var prompt = RagPrompt.BuildSystemContent(languageHint) + "\n\nContext:\n" + context + "\n\nQuestion: " + question + "\n\nAnswer:";
+        var prompt = RagPrompt.BuildSystemContent(languageHint) + "\n\n" + RagPrompt.BuildUserContent(question, context);
 
         var payload = new { model, messages = new[] { new { role = "user", content = prompt } }, max_tokens = 512, temperature = 0.15 };
 
@@ -598,8 +562,7 @@ public class HuggingFaceLLMClient : ILLMClient
         {
             if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && json.Contains("model_not_supported", StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Hugging Face model is not available: enable at least one Inference Provider at https://hf.co/settings/inference-providers.");
-            if (response.StatusCode == System.Net.HttpStatusCode.PaymentRequired || (json.Contains("depleted", StringComparison.OrdinalIgnoreCase) && json.Contains("credits", StringComparison.OrdinalIgnoreCase)))
-                throw new InvalidOperationException("HUGGINGFACE_CREDITS_EXHAUSTED: AI service credits are out of stock. Please try again later.");
+            HuggingFaceErrorHandler.ThrowIfCreditsExhausted(response.StatusCode, json);
             throw new InvalidOperationException($"HuggingFace LLM error ({response.StatusCode}): {json}");
         }
 

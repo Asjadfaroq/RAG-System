@@ -1,12 +1,50 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
 
 namespace DocumentIntelligence.Infrastructure;
+
+internal static class TokenHashing
+{
+    public static string Hash(string token)
+    {
+        var bytes = Encoding.UTF8.GetBytes(token);
+        var hash = SHA256.HashData(bytes);
+        return Convert.ToHexString(hash);
+    }
+}
+
+internal static class RefreshTokenConfig
+{
+    public static int GetExpirationDays(IConfiguration configuration)
+    {
+        var config = configuration["Jwt:RefreshTokenExpirationDays"] ?? configuration["Jwt__RefreshTokenExpirationDays"];
+        if (!string.IsNullOrWhiteSpace(config) && int.TryParse(config, out var days) && days > 0)
+            return Math.Min(days, 30);
+        return 7;
+    }
+}
 
 internal static class ConfigHelpers
 {
     /// <summary>Strips control characters from env/config values for safe use in headers and URLs.</summary>
     public static string Sanitize(string? value) =>
         string.IsNullOrEmpty(value) ? string.Empty : string.Concat(value.Trim().Where(c => !char.IsControl(c)));
+}
+
+internal static class HuggingFaceErrorHandler
+{
+    public static void ThrowIfCreditsExhausted(System.Net.HttpStatusCode statusCode, string json)
+    {
+        if (statusCode == System.Net.HttpStatusCode.PaymentRequired ||
+            json.Contains("depleted your monthly", StringComparison.OrdinalIgnoreCase) ||
+            (json.Contains("depleted", StringComparison.OrdinalIgnoreCase) && json.Contains("credits", StringComparison.OrdinalIgnoreCase)))
+        {
+            throw new InvalidOperationException(
+                "HUGGINGFACE_CREDITS_EXHAUSTED: AI service credits are out of stock. Please try again later or contact your administrator.");
+        }
+    }
 }
 
 internal static class RagPrompt
