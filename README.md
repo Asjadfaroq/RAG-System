@@ -20,6 +20,24 @@ Doc Intelligence is a full-stack application that lets you upload documents, chu
 
 ---
 
+## Screenshots
+
+<div align="center">
+
+<img src="assets/signin.png" alt="Doc Intelligence – Sign in screen" width="800" />
+
+<br/><br/>
+
+<img src="assets/chat.png" alt="Doc Intelligence – Chat over documents" width="800" />
+
+<br/><br/>
+
+<img src="assets/admin.png" alt="Doc Intelligence – Admin analytics dashboard" width="800" />
+
+</div>
+
+---
+
 ## Features
 
 - **Document upload & ingestion** — PDF/document upload, chunking, and vector embeddings
