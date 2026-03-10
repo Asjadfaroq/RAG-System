@@ -601,11 +601,11 @@ public class HuggingFaceLLMClient : ILLMClient
                 ? " Answer in Arabic only."
                 : " Answer in English only.";
 
-        var prompt = "You are a precise document Q&A assistant. Answer ONLY using the provided context.\n\n" +
+        var prompt = "You are a precise document Q&A assistant for any document type (contracts, reports, invoices, manuals, research, etc.). Answer ONLY using the provided context.\n\n" +
             "CRITICAL: Base your answer strictly on the context below. Do not infer, assume, or fabricate. " +
             "If the information is NOT in the context, say you could not find it. Never state that something is absent; " +
             "only say you could not find it in the given context.\n\n" +
-            "For lists (companies, roles, dates): include ALL matches found in the context. Do not omit any entity.\n" +
+            "For lists and structured data (entities, amounts, clauses, dates, etc.): include ALL relevant matches from the context. Do not omit any item.\n" +
             "For yes/no questions: answer only Yes or No based on explicit evidence in the context.\n" +
             languageInstruction + "\n\nContext:\n" + context + "\n\nQuestion: " + question + "\n\nAnswer:";
 
@@ -1227,9 +1227,9 @@ public class DocumentIngestionWorker : BackgroundService
     }
 
     /// <summary>
-    /// Splits text into chunks, preferring to keep logical sections (e.g., Experience entries) intact.
-    /// Uses section-aware splitting: first split by paragraphs/sections, then only split long blocks.
-    /// This improves recall for structured documents like CVs where company names and roles must stay together.
+    /// Splits text into chunks while preserving logical section boundaries.
+    /// Uses section-aware splitting for reliable recall across all document types:
+    /// contracts, reports, invoices, manuals, research papers, resumes, and more.
     /// </summary>
     private static IReadOnlyList<string> SplitTextIntoChunks(string text, int chunkSize, int overlap)
     {
@@ -1249,8 +1249,17 @@ public class DocumentIngestionWorker : BackgroundService
             return [normalized];
         }
 
-        // Section headers that typically start employment/experience blocks (case-insensitive)
-        var sectionHeaders = new[] { "experience", "employment", "work", "work experience", "professional experience", "career", "تعليم", "خبرة", "الخبرة", "الوظائف" };
+        // Section headers across document types: legal, reports, manuals, invoices, resumes, etc.
+        var sectionHeaders = new[]
+        {
+            "article", "section", "chapter", "clause", "appendix", "attachment", "schedule",
+            "experience", "employment", "work", "work experience", "professional experience", "career",
+            "introduction", "summary", "conclusion", "references", "methodology", "findings",
+            "terms", "conditions", "definitions", "obligations", "parties", "whereas",
+            "procedure", "steps", "instructions", "specifications", "requirements",
+            "item", "line item", "description", "amount", "total", "subtotal",
+            "تعليم", "خبرة", "الخبرة", "الوظائف", "المادة", "الفقرة", "الفصل"
+        };
         var lines = normalized.Split('\n');
 
         // Build semantic blocks: merge consecutive lines, split at section boundaries
@@ -1263,7 +1272,11 @@ public class DocumentIngestionWorker : BackgroundService
             if (string.IsNullOrWhiteSpace(trimmed))
                 continue;
 
-            var isNewSection = sectionHeaders.Any(h =>
+            // Numbered sections (1., 1.1, I., Article 1, etc.) common in legal, reports, manuals
+            var isNumberedSection = System.Text.RegularExpressions.Regex.IsMatch(
+                trimmed, @"^(?:\d+\.(?:\d+\.)*|\d+\)|\(?\d+\)|I{1,3}\.|IV\.?|V\.?)\s*\S");
+
+            var isNewSection = isNumberedSection || sectionHeaders.Any(h =>
                 trimmed.StartsWith(h, StringComparison.OrdinalIgnoreCase) ||
                 (trimmed.Length <= 35 && trimmed.Contains(h, StringComparison.OrdinalIgnoreCase)));
 

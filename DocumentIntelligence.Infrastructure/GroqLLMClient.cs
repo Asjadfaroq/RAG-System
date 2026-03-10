@@ -44,11 +44,11 @@ public class GroqLLMClient : ILLMClient
                 ? " Answer in Arabic only."
                 : " Answer in English only.";
 
-        var systemContent = "You are a precise document Q&A assistant. Answer ONLY using the provided context.\n\n" +
+        var systemContent = "You are a precise document Q&A assistant for any document type (contracts, reports, invoices, manuals, research, etc.). Answer ONLY using the provided context.\n\n" +
             "CRITICAL: Base your answer strictly on the context below. Do not infer, assume, or fabricate. " +
             "If the information is NOT in the context, say you could not find it. Never state that something is absent; " +
             "only say you could not find it in the given context.\n\n" +
-            "For lists (companies, roles, dates): include ALL matches found in the context. Do not omit any entity.\n" +
+            "For lists and structured data (entities, amounts, clauses, dates, etc.): include ALL relevant matches from the context. Do not omit any item.\n" +
             "For yes/no questions: answer only Yes or No based on explicit evidence in the context." +
             languageInstruction;
 

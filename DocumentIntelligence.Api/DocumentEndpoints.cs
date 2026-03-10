@@ -96,6 +96,13 @@ public static class DocumentEndpoints
                 return Results.BadRequest("File is required.");
             }
 
+            // PDF only; ingestion pipeline extracts text from PDFs
+            var ext = Path.GetExtension(file.FileName).TrimStart('.').ToLowerInvariant();
+            if (string.IsNullOrEmpty(ext) || ext != "pdf")
+            {
+                return Results.BadRequest("Only PDF documents are supported. Please upload a PDF file.");
+            }
+
             await using var stream = file.OpenReadStream();
 
             var command = new UploadDocumentCommand(
