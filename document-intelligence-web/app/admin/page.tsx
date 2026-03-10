@@ -299,7 +299,7 @@ export default function AdminPage() {
             </Link>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-3 pb-6 md:overflow-hidden md:pb-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overflow-x-hidden px-3 pb-8 md:gap-2 md:overflow-hidden md:pb-4">
           <div className="grid flex-shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
               <div key={kpi.label} className="glass-surface rounded-xl border border-zinc-800/40 p-3 shadow-lg">
@@ -350,13 +350,13 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section className="glass-surface flex min-h-[140px] flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0">
+            <section className="glass-surface flex min-h-[200px] flex-col overflow-visible rounded-xl border border-zinc-800/40 p-3 pt-4 shadow-lg md:min-h-0 md:overflow-hidden md:p-2 md:pt-2">
               <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Citation share</h2>
-              <div className="relative min-h-[120px] flex-1 w-full md:min-h-0">
+              <div className="relative min-h-[160px] flex-1 w-full md:min-h-0">
                 {citationShareData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
-                      <Pie data={citationShareData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={40} outerRadius={56} paddingAngle={2} stroke="transparent">
+                    <PieChart margin={{ top: 8, right: 8, bottom: 32, left: 8 }}>
+                      <Pie data={citationShareData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={32} outerRadius={48} paddingAngle={2} stroke="transparent">
                         {citationShareData.map((_, i) => (
                           <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                         ))}
@@ -407,7 +407,7 @@ export default function AdminPage() {
             </section>
           </div>
 
-          <section className="glass-surface flex min-h-[140px] flex-none flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0 md:flex-1">
+          <section className="glass-surface flex min-h-[140px] flex-none flex-col overflow-visible rounded-xl border border-zinc-800/40 p-3 pt-4 shadow-lg md:min-h-0 md:flex-1 md:overflow-hidden md:p-2 md:pt-2">
             <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Top documents by usage</h2>
             <div className="relative min-h-0 flex-1 w-full" style={{ minHeight: topDocsData.length > 0 ? Math.min(TOP_DOCS_MAX_HEIGHT, Math.max(60, topDocsData.length * 22)) : 60 }}>
               {topDocsData.length > 0 ? (
