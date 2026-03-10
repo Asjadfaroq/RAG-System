@@ -250,7 +250,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="app-dark-bg app-grid min-h-dvh overflow-hidden text-zinc-50 md:min-h-screen">
+    <main className="app-dark-bg app-grid h-dvh overflow-hidden text-zinc-50 md:h-screen">
       <div className="flex h-full w-full min-h-0">
         {sidebarOpen && (
           <div
@@ -260,7 +260,7 @@ export default function AdminPage() {
           />
         )}
         <aside
-          className={`glass-surface fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-zinc-800/40 p-3 transition-transform duration-300 ease-out md:relative md:inset-auto md:z-auto md:w-56 md:max-w-none md:flex-shrink-0 md:translate-x-0 ${
+          className={`glass-surface fixed inset-y-0 left-0 z-50 flex w-64 max-w-[85vw] flex-col border-r border-zinc-800/40 p-3 transition-transform duration-300 ease-out md:relative md:inset-auto md:z-auto md:h-full md:w-56 md:max-w-none md:flex-shrink-0 md:translate-x-0 ${
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >
