@@ -11,7 +11,7 @@ export function AppFooter({ variant = "full" }: Props) {
       <p className="mt-3 border-t border-zinc-800/40 pt-3 text-center text-[10px] leading-relaxed text-zinc-600">
         © {new Date().getFullYear()} Doc Intelligence
         <br />
-        <span className="text-zinc-500">Made by Asjiad Farooq</span>
+        <span className="text-zinc-500">Developed by Asjad Farooq</span>
       </p>
     );
   }
@@ -22,7 +22,7 @@ export function AppFooter({ variant = "full" }: Props) {
       <p className="text-[11px] font-medium tracking-wide text-zinc-500">
         © {new Date().getFullYear()} Document Intelligence
       </p>
-      <p className="text-[11px] text-zinc-600">Made by Asjiad Farooq</p>
+      <p className="text-[11px] text-zinc-600">Developed by Asjad Farooq</p>
     </footer>
   );
 }
