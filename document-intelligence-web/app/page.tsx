@@ -523,8 +523,16 @@ export default function Home() {
 
   if (!authChecked || !isLoggedIn) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-black p-6">
-        <p className="text-zinc-400">Loading...</p>
+      <main className="app-dark-bg app-grid flex min-h-screen items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="flex flex-col items-center gap-4"
+        >
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500/40 border-t-indigo-400" />
+          <p className="text-sm text-zinc-400">Loading...</p>
+        </motion.div>
       </main>
     );
   }
@@ -533,7 +541,12 @@ export default function Home() {
     <main className="app-dark-bg app-grid h-screen text-zinc-50" dir={dir}>
       <div className="flex h-screen w-full overflow-hidden">
         {/* Sidebar */}
-        <aside className="glass-surface hidden w-56 flex-shrink-0 flex-col border-r border-zinc-800/40 p-3 md:flex">
+        <motion.aside
+          initial={{ opacity: 0, x: -8 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          className="glass-surface hidden w-56 flex-shrink-0 flex-col border-r border-zinc-800/40 p-3 md:flex"
+        >
           <h1 className="mb-4 text-sm font-semibold tracking-tight text-zinc-100">
             {locale === "ar" ? "الذكاء المستندي" : "Doc Intelligence"}
           </h1>
@@ -578,14 +591,14 @@ export default function Home() {
           </div>
 
           <nav className="mt-3 space-y-0.5 border-t border-zinc-800/50 pt-3">
-            <Link href="/" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+            <Link href="/" className="nav-link block rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
               {locale === "ar" ? "لوحة التحكم" : "Dashboard"}
             </Link>
-            <Link href="/team" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+            <Link href="/team" className="nav-link block rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
               {locale === "ar" ? "الفريق" : "Team"}
             </Link>
             {canCreateWorkspace && (
-              <a href="/admin" className="block rounded px-2 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
+              <a href="/admin" className="nav-link block rounded-lg px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200">
                 {locale === "ar" ? "التحليلات" : "Admin"}
               </a>
             )}
@@ -623,10 +636,15 @@ export default function Home() {
               {locale === "ar" ? "تسجيل الخروج" : "Logout"}
             </button>
           </div>
-        </aside>
+        </motion.aside>
 
         {/* Main content */}
-        <div className="flex min-h-0 flex-1 flex-col p-3 md:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+          className="flex min-h-0 flex-1 flex-col p-3 md:p-4"
+        >
           <header className="mb-3 flex items-center justify-between">
             <h2 className="text-base font-semibold tracking-tight text-zinc-100">
               {locale === "ar" ? "المحادثة" : "Chat"}
@@ -764,23 +782,31 @@ export default function Home() {
 
             {/* Documents in workspace (collapsible, folded by default) */}
             {workspaceId && documents.length > 0 && documentsExpanded && (
-              <div className="border-b border-zinc-700/30 px-3 py-2">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.2 }}
+                className="border-b border-zinc-700/30 px-3 py-2"
+              >
                 <p className="mb-1.5 text-[10px] font-medium text-zinc-500">
                   {locale === "ar" ? "مستندات في المساحة" : "Documents in workspace"}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {documents.map((doc) => (
-                    <div
-                      key={doc.id}
+                  {documents.map((document, index) => (
+                    <motion.div
+                      key={document.id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2, delay: index * 0.03 }}
                       className="flex items-center gap-1.5 rounded-lg border border-zinc-700/40 bg-zinc-900/40 px-2.5 py-1.5"
                     >
-                      <span className="max-w-[140px] truncate text-[11px] text-zinc-300" title={doc.fileName}>
-                        {doc.fileName}
+                      <span className="max-w-[140px] truncate text-[11px] text-zinc-300" title={document.fileName}>
+                        {document.fileName}
                       </span>
-                      <DocumentStatusBadge status={mapStatusCode(doc.status)} locale={locale === "ar" ? "ar" : "en"} />
+                      <DocumentStatusBadge status={mapStatusCode(document.status)} locale={locale === "ar" ? "ar" : "en"} />
                       <button
                         type="button"
-                        onClick={() => setDeleteDocumentId(doc.id)}
+                        onClick={() => setDeleteDocumentId(document.id)}
                         className="ml-0.5 rounded p-0.5 text-zinc-500 hover:bg-zinc-700/60 hover:text-red-400"
                         title={locale === "ar" ? "حذف" : "Delete"}
                         aria-label="Delete document"
@@ -789,10 +815,10 @@ export default function Home() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                         </svg>
                       </button>
-                    </div>
+                    </motion.div>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             )}
 
             {/* Chat area */}
@@ -809,13 +835,15 @@ export default function Home() {
                       : "Create a workspace from the sidebar to start uploading documents and asking questions."}
                   </p>
                   {canCreateWorkspace && (
-                    <button
+                    <motion.button
                       type="button"
                       onClick={() => setShowCreateWorkspaceModal(true)}
-                      className="rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-5 py-2.5 text-sm font-medium text-indigo-300 transition-colors hover:bg-indigo-500/30"
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      className="rounded-xl border border-indigo-500/50 bg-indigo-500/20 px-5 py-2.5 text-sm font-medium text-indigo-300 shadow-lg shadow-indigo-500/10 transition-colors hover:bg-indigo-500/30"
                     >
                       {locale === "ar" ? "أنشئ مساحة عمل" : "Create workspace"}
-                    </button>
+                    </motion.button>
                   )}
                 </div>
               )}
@@ -837,7 +865,7 @@ export default function Home() {
                     <div className="input-glow flex items-center gap-3 rounded-2xl border border-zinc-600/40 bg-zinc-900/60 px-4 py-3.5 shadow-lg transition-all duration-200 focus-within:border-indigo-500/50 focus-within:bg-zinc-900/80">
                       <button
                         type="button"
-                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
                         title={locale === "ar" ? "إرفاق PDF" : "Attach PDF"}
                         onClick={() => document.getElementById("pdf-upload-input")?.click()}
                       >
@@ -864,7 +892,10 @@ export default function Home() {
                           </svg>
                         </button>
                         {showSettings && (
-                          <div
+                          <motion.div
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.2 }}
                             className="absolute bottom-full right-0 mb-1 w-48 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-2 shadow-xl"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -904,7 +935,7 @@ export default function Home() {
                                 </select>
                               </div>
                             </div>
-                          </div>
+                          </motion.div>
                         )}
                         <button
                           type="submit"
@@ -937,10 +968,10 @@ export default function Home() {
                     return (
                       <motion.div
                         key={item.id}
-                        initial={{ opacity: 0, y: 8 }}
+                        initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -8 }}
-                        transition={{ duration: 0.2 }}
+                        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
                         className="space-y-1.5"
                       >
                         <ChatMessageBubble
@@ -1011,7 +1042,7 @@ export default function Home() {
               >
                 <button
                   type="button"
-                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 hover:bg-zinc-800/50 hover:text-zinc-300"
+                  className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800/50 hover:text-zinc-300"
                   title={locale === "ar" ? "إرفاق PDF" : "Attach PDF"}
                   onClick={() => document.getElementById("pdf-upload-input")?.click()}
                 >
@@ -1038,7 +1069,10 @@ export default function Home() {
                     </svg>
                   </button>
                   {showSettings && (
-                    <div
+                    <motion.div
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
                       className="absolute bottom-full right-0 mb-1 w-48 rounded-lg border border-zinc-700/60 bg-zinc-900 px-2 py-2 shadow-xl"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1078,7 +1112,7 @@ export default function Home() {
                           </select>
                         </div>
                       </div>
-                    </div>
+                    </motion.div>
                   )}
                   <button
                     type="submit"
@@ -1096,7 +1130,7 @@ export default function Home() {
               )}
             </div>
           </section>
-        </div>
+        </motion.div>
       </div>
     </main>
   );

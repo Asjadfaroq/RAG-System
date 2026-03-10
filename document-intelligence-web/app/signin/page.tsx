@@ -61,11 +61,11 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 p-6">
-      <h1 className="text-2xl font-semibold">Sign In</h1>
+    <main className="app-dark-bg app-grid mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-6 p-6">
+      <h1 className="text-2xl font-semibold text-zinc-100">Sign In</h1>
       <form className="flex flex-col gap-4" onSubmit={handleSubmit}>
         <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
+          className="rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
           type="email"
           placeholder="Email"
           value={email}
@@ -73,7 +73,7 @@ export default function SignInPage() {
           required
         />
         <input
-          className="rounded border border-zinc-600 bg-transparent p-2"
+          className="rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
           type="password"
           placeholder="Password"
           value={password}
@@ -81,7 +81,7 @@ export default function SignInPage() {
           required
         />
         <button
-          className="rounded bg-blue-600 p-2 font-medium text-white disabled:opacity-60"
+          className="rounded-lg bg-indigo-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
           type="submit"
           disabled={busy}
         >

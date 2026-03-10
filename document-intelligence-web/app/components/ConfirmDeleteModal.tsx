@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, FormEvent, useEffect } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 type Props = {
   open: boolean;
@@ -49,22 +50,32 @@ export default function ConfirmDeleteModal({
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="confirm-delete-title"
-    >
-      <button
-        type="button"
-        className="absolute inset-0"
-        onClick={onClose}
-        aria-label="Close"
-      />
-      <div className="relative w-full max-w-md rounded-2xl border border-zinc-700/60 bg-zinc-900/95 p-6 shadow-2xl ring-1 ring-white/5">
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-delete-title"
+        >
+          <button
+            type="button"
+            className="absolute inset-0"
+            onClick={onClose}
+            aria-label="Close"
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 4 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="relative w-full max-w-md rounded-2xl border border-zinc-700/60 bg-zinc-900/95 p-6 shadow-2xl ring-1 ring-white/5"
+          >
         <h2 id="confirm-delete-title" className="text-lg font-semibold text-zinc-100">
           {title}
         </h2>
@@ -106,7 +117,9 @@ export default function ConfirmDeleteModal({
             </button>
           </div>
         </form>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

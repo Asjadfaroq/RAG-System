@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 
 type Props = {
   open: boolean;
@@ -46,35 +47,43 @@ export default function CreateWorkspaceModal({ open, onClose, onSubmit }: Props)
     }
   }
 
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="create-workspace-title"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-lg border border-zinc-600 bg-zinc-900 p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 id="create-workspace-title" className="text-lg font-semibold">
-            Create workspace
-          </h2>
-          <button
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-workspace-title"
+          onClick={onClose}
+        >
+          <motion.div
+            initial={{ opacity: 0, scale: 0.96, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.98, y: 4 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full max-w-md rounded-xl border border-zinc-600/80 bg-zinc-900/95 p-6 shadow-2xl ring-1 ring-white/5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <h2 id="create-workspace-title" className="text-lg font-semibold text-zinc-100">
+                Create workspace
+              </h2>
+              <button
             type="button"
             onClick={onClose}
-            className="rounded p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+                className="rounded-lg p-1.5 text-zinc-400 transition-colors hover:bg-zinc-800 hover:text-white"
+                aria-label="Close"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
@@ -84,7 +93,7 @@ export default function CreateWorkspaceModal({ open, onClose, onSubmit }: Props)
             <input
               id="workspace-name"
               type="text"
-              className="w-full rounded border border-zinc-600 bg-transparent p-2"
+              className="w-full rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
               placeholder="Workspace name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -99,7 +108,7 @@ export default function CreateWorkspaceModal({ open, onClose, onSubmit }: Props)
             <input
               id="workspace-description"
               type="text"
-              className="w-full rounded border border-zinc-600 bg-transparent p-2"
+              className="w-full rounded-lg border border-zinc-600/80 bg-zinc-800/50 px-3 py-2.5 text-zinc-100 placeholder-zinc-500 transition-colors focus:border-indigo-500/60 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
               placeholder="Short description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
@@ -115,21 +124,23 @@ export default function CreateWorkspaceModal({ open, onClose, onSubmit }: Props)
             <button
               type="button"
               onClick={onClose}
-              className="rounded border border-zinc-600 px-4 py-2 text-sm hover:bg-zinc-800"
+              className="rounded-lg border border-zinc-600/80 px-4 py-2 text-sm text-zinc-300 transition-colors hover:bg-zinc-800"
               disabled={busy}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="rounded bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-500 disabled:opacity-60"
               disabled={busy || !name.trim()}
             >
               {busy ? "Creating…" : "Create"}
             </button>
           </div>
         </form>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

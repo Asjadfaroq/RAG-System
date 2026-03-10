@@ -89,9 +89,9 @@ export function ChatMessageBubble({
   return (
     <div className={`group flex ${alignment}`}>
       <motion.div
-        initial={{ opacity: 0, y: 6 }}
+        initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.2, ease: "easeOut" }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className={`max-w-[85%] rounded-xl px-3 py-2 text-sm ${
           isUser
             ? "bg-indigo-500/95 text-white shadow-md"
