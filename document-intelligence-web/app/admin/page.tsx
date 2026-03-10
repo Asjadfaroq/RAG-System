@@ -65,13 +65,13 @@ function ChartTooltip({
   valueFormatter = (v: number) => v.toString(),
 }: {
   active?: boolean;
-  payload?: Array<{ value: number; name: string }>;
+  payload?: Array<{ value?: number; name?: string }>;
   label?: string;
   valueLabel?: string;
   valueFormatter?: (v: number) => string;
 }) {
   if (!active || !payload?.length) return null;
-  const value = payload[0].value;
+  const value = payload[0].value ?? 0;
   return (
     <div className="pointer-events-none rounded-xl border border-zinc-600/60 bg-zinc-900/98 px-4 py-3 shadow-2xl shadow-black/50 backdrop-blur-md ring-1 ring-white/5">
       {label && <p className="mb-1.5 truncate max-w-[220px] text-[11px] font-semibold uppercase tracking-wider text-zinc-400">{label}</p>}
@@ -323,7 +323,7 @@ export default function AdminPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
                       <XAxis dataKey="date" stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} width={32} />
-                      <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload} label={label ? `Date: ${label}` : undefined} valueLabel="Questions" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
+                      <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload?.map(p => ({ value: typeof p.value === "number" ? p.value : 0, name: typeof p.name === "string" ? p.name : String(p.name ?? "") }))} label={label ? `Date: ${label}` : undefined} valueLabel="Questions" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
                       <Line type="monotone" dataKey="questions" stroke="rgb(99, 102, 241)" strokeWidth={2} dot={{ fill: "rgb(99, 102, 241)", strokeWidth: 0, r: 3 }} activeDot={{ r: 5, fill: "rgb(129, 140, 248)" }} />
                     </LineChart>
                   </ResponsiveContainer>
@@ -342,7 +342,7 @@ export default function AdminPage() {
                       <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} vertical={false} />
                       <XAxis dataKey="name" stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} />
                       <YAxis stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} width={32} />
-                      <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload} label={label ? `Workspace: ${label}` : undefined} valueLabel="Documents" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
+                      <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload?.map(p => ({ value: typeof p.value === "number" ? p.value : 0, name: typeof p.name === "string" ? p.name : String(p.name ?? "") }))} label={label ? `Workspace: ${label}` : undefined} valueLabel="Documents" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
                       <Bar dataKey="documents" fill="rgb(99, 102, 241)" radius={[6, 6, 0, 0]} maxBarSize={48} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -418,7 +418,7 @@ export default function AdminPage() {
                     <CartesianGrid strokeDasharray="3 3" stroke={GRID_COLOR} horizontal={false} />
                     <XAxis type="number" stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} />
                     <YAxis type="category" dataKey="name" stroke={AXIS_COLOR} fontSize={11} tickLine={false} axisLine={false} width={140} />
-                    <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload} label={label as string} valueLabel="Citations" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
+                    <Tooltip content={({ active, payload, label }) => <ChartTooltip active={active} payload={payload?.map(p => ({ value: typeof p.value === "number" ? p.value : 0, name: typeof p.name === "string" ? p.name : String(p.name ?? "") }))} label={label as string} valueLabel="Citations" />} cursor={{ stroke: GRID_COLOR, strokeWidth: 1 }} />
                     <Bar dataKey="usage" fill="rgb(34, 197, 94)" radius={[0, 6, 6, 0]} maxBarSize={20} />
                   </BarChart>
                 </ResponsiveContainer>
