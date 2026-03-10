@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import { AppFooter } from "../components/AppFooter";
 
 type TenantMember = {
   id: string;
@@ -430,6 +431,7 @@ export default function TeamPage() {
             >
               Logout
             </button>
+            <AppFooter variant="compact" />
           </div>
         </aside>
 

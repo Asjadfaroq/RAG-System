@@ -12,6 +12,7 @@ import {
 } from "./lib/api";
 import CreateWorkspaceModal from "./components/CreateWorkspaceModal";
 import ConfirmDeleteModal from "./components/ConfirmDeleteModal";
+import { AppFooter } from "./components/AppFooter";
 import { useLanguage } from "./components/LanguageProvider";
 import { useToast } from "./components/ToastProvider";
 import { ChatMessageBubble } from "./components/ChatMessageBubble";
@@ -643,6 +644,7 @@ export default function Home() {
             >
               {locale === "ar" ? "تسجيل الخروج" : "Logout"}
             </button>
+            <AppFooter variant="compact" />
           </div>
         </aside>
 

@@ -19,6 +19,7 @@ import {
 } from "recharts";
 import { getApiBase, readResponseBody, formatError } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
+import { AppFooter } from "../components/AppFooter";
 
 type AuthMe = { tenantId: string; email: string; role: string };
 
@@ -272,6 +273,7 @@ export default function AdminPage() {
           <div className="mt-auto border-t border-zinc-800/50 pt-3">
             <p className="mb-1 px-2 text-[10px] text-zinc-500">{email}</p>
             <p className="px-2 text-[10px] text-zinc-500">{role}</p>
+            <AppFooter variant="compact" />
           </div>
         </aside>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { ReactNode } from "react";
+import { AppFooter } from "./AppFooter";
 
 type Props = {
   children: ReactNode;
@@ -81,6 +82,8 @@ export default function AuthLayout({ children, title, subtitle }: Props) {
           <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/40 px-6 py-6 shadow-xl ring-1 ring-white/5 backdrop-blur-sm sm:px-8 sm:py-8">
             {children}
           </div>
+
+          <AppFooter variant="full" />
         </div>
       </div>
     </main>
