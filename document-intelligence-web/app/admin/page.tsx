@@ -299,7 +299,7 @@ export default function AdminPage() {
             </Link>
           </div>
 
-          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-3 pb-4 md:px-4">
+          <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overflow-x-hidden px-3 pb-6 md:overflow-hidden md:pb-4">
           <div className="grid flex-shrink-0 gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {kpis.map((kpi) => (
               <div key={kpi.label} className="glass-surface rounded-xl border border-zinc-800/40 p-3 shadow-lg">
@@ -311,10 +311,10 @@ export default function AdminPage() {
             ))}
           </div>
 
-          <div className="grid min-h-0 flex-[3] gap-2 overflow-hidden lg:grid-cols-2 lg:grid-rows-[1fr_1fr]">
-            <section className="glass-surface flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg">
+          <div className="grid min-h-[380px] flex-none gap-2 md:min-h-0 md:flex-[3] md:overflow-hidden lg:grid-cols-2 lg:grid-rows-[1fr_1fr]">
+            <section className="glass-surface flex min-h-[140px] flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0">
               <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Questions per day</h2>
-              <div className="relative min-h-0 flex-1 w-full">
+              <div className="relative min-h-[120px] flex-1 w-full md:min-h-0">
                 {questionsChartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={questionsChartData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
@@ -331,9 +331,9 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section className="glass-surface flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg">
+            <section className="glass-surface flex min-h-[140px] flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0">
               <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Documents per workspace</h2>
-              <div className="relative min-h-0 flex-1 w-full">
+              <div className="relative min-h-[120px] flex-1 w-full md:min-h-0">
                 {docsByWorkspaceData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={docsByWorkspaceData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }}>
@@ -350,9 +350,9 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section className="glass-surface flex min-h-0 flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg">
+            <section className="glass-surface flex min-h-[140px] flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0">
               <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Citation share</h2>
-              <div className="relative min-h-0 flex-1 w-full">
+              <div className="relative min-h-[120px] flex-1 w-full md:min-h-0">
                 {citationShareData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
@@ -387,7 +387,7 @@ export default function AdminPage() {
               </div>
             </section>
 
-            <section className="glass-surface flex min-h-0 flex-col justify-center overflow-hidden rounded-xl border border-zinc-800/40 p-3 shadow-lg">
+            <section className="glass-surface flex min-h-[100px] flex-col justify-center overflow-hidden rounded-xl border border-zinc-800/40 p-3 shadow-lg md:min-h-0">
               <h2 className="mb-3 flex-shrink-0 text-sm font-semibold text-zinc-200">Usage summary</h2>
               <div className="space-y-2.5 text-xs">
                 <div className="flex justify-between gap-2">
@@ -407,7 +407,7 @@ export default function AdminPage() {
             </section>
           </div>
 
-          <section className="glass-surface flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg">
+          <section className="glass-surface flex min-h-[140px] flex-none flex-col overflow-hidden rounded-xl border border-zinc-800/40 p-2 shadow-lg md:min-h-0 md:flex-1">
             <h2 className="mb-1 flex-shrink-0 text-sm font-semibold text-zinc-200">Top documents by usage</h2>
             <div className="relative min-h-0 flex-1 w-full" style={{ minHeight: topDocsData.length > 0 ? Math.min(TOP_DOCS_MAX_HEIGHT, Math.max(60, topDocsData.length * 22)) : 60 }}>
               {topDocsData.length > 0 ? (
