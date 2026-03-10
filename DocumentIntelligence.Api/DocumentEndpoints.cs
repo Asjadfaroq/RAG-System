@@ -73,13 +73,33 @@ public static class DocumentEndpoints
             ClaimsPrincipal user,
             IMediator mediator,
             IWorkspaceAccessService workspaceAccessService,
+            IRateLimitService rateLimit,
             ILoggerFactory loggerFactory,
             CancellationToken ct) =>
         {
             var log = loggerFactory.CreateLogger("DocumentIntelligence.Documents");
             var tenantId = user.GetTenantId();
+            var userId = user.GetUserId();
             if (tenantId == null)
                 return Results.Unauthorized();
+
+            var tid = tenantId.Value;
+            var clientKey = userId != null ? $"{tid}:{userId}" : tid.ToString();
+            if (!await rateLimit.AllowAsync("upload:minute", clientKey, 3, 60, ct))
+            {
+                log.LogWarning("Upload rate limited (per minute): Key={Key}", clientKey);
+                return Results.Json(new { title = "Upload limit reached. You can upload 3 documents per minute.", status = 429 }, statusCode: 429);
+            }
+            if (!await rateLimit.AllowAsync("upload:hour", clientKey, 20, 3600, ct))
+            {
+                log.LogWarning("Upload rate limited (per hour): Key={Key}", clientKey);
+                return Results.Json(new { title = "Upload limit reached. You can upload 20 documents per hour.", status = 429 }, statusCode: 429);
+            }
+            if (!await rateLimit.AllowAsync("upload:day", clientKey, 50, 86400, ct))
+            {
+                log.LogWarning("Upload rate limited (per day): Key={Key}", clientKey);
+                return Results.Json(new { title = "Upload limit reached. You can upload 50 documents per day.", status = 429 }, statusCode: 429);
+            }
 
             if (!Guid.TryParse(workspaceId, out var workspaceGuid))
             {

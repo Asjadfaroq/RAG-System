@@ -251,8 +251,7 @@ public static class AuthEndpoints
                 log.LogError(ex, "Login failed (unexpected): TenantSlug={TenantSlug}, Email={Email}", request.TenantSlug, request.Email);
                 return Results.Json(new { title = "Login failed.", status = 500 }, statusCode: 500);
             }
-        })
-        .RequireRateLimiting("login-rl");
+        });
 
         group.MapPost("/login-simple", async (
             SimpleLoginRequest request,
@@ -310,8 +309,7 @@ public static class AuthEndpoints
                 log.LogError(ex, "Login (simple) failed (unexpected): Email={Email}", request.Email);
                 return Results.Json(new { title = "Login failed.", status = 500 }, statusCode: 500);
             }
-        })
-        .RequireRateLimiting("login-rl");
+        });
 
         group.MapPost("/refresh", async (
             RefreshRequest? body,

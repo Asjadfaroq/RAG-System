@@ -58,8 +58,17 @@ builder.Services.AddCors(options =>
 
                 if (allowedHosts.Length > 0)
                 {
-                    // Strict: only origins whose host is in the whitelist (case-insensitive)
-                    return allowedHosts.Any(h => string.Equals(h?.Trim(), uri.Host, StringComparison.OrdinalIgnoreCase));
+                    // Accept full origin (https://example.vercel.app) or host-only (example.vercel.app)
+                    return allowedHosts.Any(h =>
+                    {
+                        var v = h?.Trim();
+                        if (string.IsNullOrEmpty(v)) return false;
+                        if (string.Equals(v, origin, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (string.Equals(v, uri.Host, StringComparison.OrdinalIgnoreCase)) return true;
+                        if (Uri.TryCreate(v, UriKind.Absolute, out var allowedUri) && string.Equals(allowedUri.Host, uri.Host, StringComparison.OrdinalIgnoreCase))
+                            return true;
+                        return false;
+                    });
                 }
 
                 // No origins configured: in Development allow localhost only; in Production allow none (must set env)
