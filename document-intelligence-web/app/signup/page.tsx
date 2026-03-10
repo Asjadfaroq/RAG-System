@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { getApiBase, readResponseBody, formatError } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
 import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 
 const inputBase =
   "w-full rounded-xl border border-zinc-600/80 bg-zinc-800/40 pl-10 pr-4 py-3 text-zinc-100 placeholder-zinc-500 transition-all duration-200 focus:border-indigo-500/60 focus:bg-zinc-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
@@ -95,40 +96,27 @@ export default function SignUpPage() {
           <label htmlFor="password" className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
             Password
           </label>
-          <div className="relative">
-            <svg className={inputIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <input
-              id="password"
-              className={inputBase}
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          <PasswordInput
+            id="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </div>
 
         <div className="space-y-2">
           <label htmlFor="confirmPassword" className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
             Confirm password
           </label>
-          <div className="relative">
-            <svg className={inputIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-            <input
-              id="confirmPassword"
-              className={inputBase}
-              type="password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              required
-            />
-          </div>
+          <PasswordInput
+            id="confirmPassword"
+            placeholder="••••••••"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+          />
         </div>
 
         {status && (

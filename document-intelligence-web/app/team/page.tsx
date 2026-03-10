@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { getApiBase, readResponseBody, formatError, AuthResponse } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
 import ConfirmDeleteModal from "../components/ConfirmDeleteModal";
+import PasswordInput from "../components/PasswordInput";
 import { AppFooter } from "../components/AppFooter";
 import { MobileBottomNav } from "../components/MobileBottomNav";
 import { useLanguage } from "../components/LanguageProvider";
@@ -603,13 +604,12 @@ export default function TeamPage() {
                   required
                   className="w-full rounded-xl border border-zinc-700/50 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
                 />
-                <input
-                  type="password"
+                <PasswordInput
                   placeholder="Password"
                   value={joinPassword}
                   onChange={(e) => setJoinPassword(e.target.value)}
                   required
-                  className="w-full rounded-xl border border-zinc-700/50 bg-zinc-900/50 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-500 focus:border-indigo-500/50 focus:outline-none focus:ring-1 focus:ring-indigo-500/30"
+                  showLockIcon={false}
                 />
                 <button
                   type="submit"

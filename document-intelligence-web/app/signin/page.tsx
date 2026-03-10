@@ -11,6 +11,7 @@ import {
 } from "../lib/api";
 import { useToast } from "../components/ToastProvider";
 import AuthLayout from "../components/AuthLayout";
+import PasswordInput from "../components/PasswordInput";
 
 const inputBase =
   "w-full rounded-xl border border-zinc-600/80 bg-zinc-800/40 pl-10 pr-4 py-3 text-zinc-100 placeholder-zinc-500 transition-all duration-200 focus:border-indigo-500/60 focus:bg-zinc-800/60 focus:outline-none focus:ring-2 focus:ring-indigo-500/20";
@@ -93,20 +94,13 @@ export default function SignInPage() {
           <label htmlFor="password" className="block text-xs font-medium uppercase tracking-wider text-zinc-500">
             Password
           </label>
-          <div className="relative">
-            <svg className={inputIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-            </svg>
-            <input
-              id="password"
-              className={inputBase}
-              type="password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
+          <PasswordInput
+            id="password"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
         </div>
 
         {status && (
