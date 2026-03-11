@@ -360,8 +360,9 @@ public static class AuthEndpoints
             return Results.Ok(new { message = "Logged out." });
         });
 
-        group.MapPost("/accept-invite", async (
+        group.MapPost("/accept-invite", [Authorize] async (
             AcceptInviteRequest request,
+            ClaimsPrincipal user,
             HttpContext ctx,
             IMediator mediator,
             IRateLimitService rateLimit,
@@ -376,21 +377,28 @@ public static class AuthEndpoints
                 return Results.Json(new { title = "Too many attempts. Try again in a minute.", status = 429 }, statusCode: 429);
             }
 
+            var authenticatedEmail = user.GetEmail();
+            if (string.IsNullOrWhiteSpace(authenticatedEmail))
+            {
+                log.LogWarning("Accept invite failed: missing authenticated email");
+                return Results.Unauthorized();
+            }
+
             if (!IsPasswordStrong(request.Password, out var pwdError))
             {
                 return Results.BadRequest(new { title = pwdError, status = 400 });
             }
             try
             {
-                var command = new AcceptInviteCommand(request.Code, request.Password);
+                var command = new AcceptInviteCommand(request.Code, request.Password, authenticatedEmail);
                 var result = await mediator.Send(command, ct);
                 log.LogInformation("Invite accepted: Code={Code}, Email={Email}, TenantId={TenantId}", request.Code, result.Email, result.TenantId);
                 return OkWithAuthCookies(ctx, result);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
-                log.LogWarning("Accept invite failed (unauthorized): Code={Code}", request.Code);
-                return Results.Unauthorized();
+                log.LogWarning(ex, "Accept invite failed (unauthorized): Code={Code}", request.Code);
+                return Results.BadRequest(new { title = ex.Message, status = 400 });
             }
             catch (Exception ex)
             {

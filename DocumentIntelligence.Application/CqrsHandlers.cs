@@ -188,7 +188,8 @@ public record CreateTenantInviteCommand(
 
 public record AcceptInviteCommand(
     string Code,
-    string Password) : IRequest<AuthResult>;
+    string Password,
+    string AuthenticatedEmail) : IRequest<AuthResult>;
 
 public record TenantMembershipDto(
     Guid TenantId,
@@ -803,18 +804,27 @@ public class AcceptInviteCommandHandler : IRequestHandler<AcceptInviteCommand, A
         var inviteHash = Sha256Hash.Compute(code);
         var invite = _db.TenantInvites.FirstOrDefault(i => i.Code == inviteHash);
         if (invite is null || invite.IsUsed || invite.ExpiresAt <= DateTime.UtcNow)
-            throw new UnauthorizedAccessException("Invite is invalid or expired.");
+            throw new UnauthorizedAccessException("Invalid invite code.");
 
-        var email = invite.Email.ToLowerInvariant();
-        var existingUser = _db.Users.FirstOrDefault(u => u.TenantId == invite.TenantId && u.Email == email);
-        if (existingUser is not null)
+        var authenticatedEmail = request.AuthenticatedEmail.Trim().ToLowerInvariant();
+        var invitedEmail = invite.Email.ToLowerInvariant();
+        if (!string.Equals(authenticatedEmail, invitedEmail, StringComparison.Ordinal))
+            throw new UnauthorizedAccessException("Invalid invite code.");
+
+        // Ensure this email is not already a member of the invited tenant
+        var existingUserInTenant = _db.Users.FirstOrDefault(u => u.TenantId == invite.TenantId && u.Email == authenticatedEmail);
+        if (existingUserInTenant is not null)
             throw new InvalidOperationException("User is already a member of this tenant.");
+
+        // Reuse password hash from any existing account with this email, or fall back to the provided password.
+        var existingUserAnyTenant = _db.Users.FirstOrDefault(u => u.Email == authenticatedEmail);
+        var passwordHash = existingUserAnyTenant?.PasswordHash ?? _passwordHasher.Hash(request.Password);
 
         var user = new User
         {
             Id = Guid.NewGuid(),
-            Email = email,
-            PasswordHash = _passwordHasher.Hash(request.Password),
+            Email = authenticatedEmail,
+            PasswordHash = passwordHash,
             Role = invite.Role,
             TenantId = invite.TenantId,
             CreatedAt = DateTime.UtcNow
