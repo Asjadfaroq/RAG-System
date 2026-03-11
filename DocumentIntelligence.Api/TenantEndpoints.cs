@@ -1,8 +1,10 @@
 using System.Security.Claims;
 using DocumentIntelligence.Application;
 using DocumentIntelligence.Domain;
+using DocumentIntelligence.Infrastructure;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace DocumentIntelligence.Api;
 
@@ -69,6 +71,52 @@ public static class TenantEndpoints
             {
                 log.LogError(ex, "Invite creation failed (unexpected): TenantId={TenantId}, Email={Email}", tenantId, request.Email);
                 return Results.Json(new { title = "Invite creation failed. Please try again.", status = 500 }, statusCode: 500);
+            }
+        });
+
+        group.MapDelete("/members/{memberId:guid}", async (
+            Guid memberId,
+            ClaimsPrincipal user,
+            ApplicationDbContext db,
+            ILoggerFactory loggerFactory,
+            CancellationToken ct) =>
+        {
+            var log = loggerFactory.CreateLogger("DocumentIntelligence.TenantMembers");
+            var tenantId = user.GetTenantId();
+            if (tenantId == null)
+                return Results.Unauthorized();
+
+            var currentUserId = user.GetUserId();
+
+            var tenantUserRole = user.GetRole();
+            if (!string.Equals(tenantUserRole, UserRole.Owner.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(tenantUserRole, UserRole.Admin.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Forbid();
+            }
+
+            try
+            {
+                if (currentUserId != null && memberId == currentUserId.Value)
+                    return Results.BadRequest(new { title = "You cannot remove yourself from the tenant.", status = 400 });
+
+                var member = await db.Users.FirstOrDefaultAsync(u => u.Id == memberId && u.TenantId == tenantId.Value, ct);
+                if (member is null)
+                    return Results.BadRequest(new { title = "Member not found in this tenant.", status = 400 });
+
+                if (member.Role == UserRole.Owner)
+                    return Results.BadRequest(new { title = "You cannot remove the tenant owner.", status = 400 });
+
+                db.Users.Remove(member);
+                await db.SaveChangesAsync(ct);
+
+                log.LogInformation("Member removed: TenantId={TenantId}, MemberId={MemberId}", tenantId, memberId);
+                return Results.NoContent();
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex, "Remove member failed (unexpected): TenantId={TenantId}, MemberId={MemberId}", tenantId, memberId);
+                return Results.Json(new { title = "Failed to remove member. Please try again.", status = 500 }, statusCode: 500);
             }
         });
 

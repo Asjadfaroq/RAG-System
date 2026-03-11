@@ -222,6 +222,7 @@ export default function TeamPage() {
       setUserFromAuth(auth);
       setActiveTenantId(auth.tenantId);
       await loadWorkspaces();
+      await loadMembers();
       setStatus("Tenant switched.");
       showToast("Tenant switched.", "success");
     } catch (err) {
@@ -528,6 +529,30 @@ export default function TeamPage() {
                             </p>
                           </div>
                           <RoleBadge role={m.role} />
+                          {canInvite && m.role !== "Owner" && m.email !== email && (
+                            <button
+                              type="button"
+                              onClick={async () => {
+                                try {
+                                  const res = await fetch(`${getApiBase()}/tenant/members/${m.id}`, {
+                                    method: "DELETE",
+                                    credentials: "include",
+                                  });
+                                  const body = await readResponseBody(res);
+                                  if (!res.ok) throw new Error(formatError(res.status, body));
+                                  showToast("Member removed.", "success");
+                                  await loadMembers();
+                                } catch (err) {
+                                  const msg = err instanceof Error ? err.message : "Failed to remove member.";
+                                  showToast(msg, "error");
+                                }
+                              }}
+                              className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-md border border-red-500/40 text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:border-red-400/70 hover:text-red-300"
+                              title={locale === "ar" ? "إزالة العضو" : "Remove member"}
+                            >
+                              ✕
+                            </button>
+                          )}
                         </motion.li>
                       ))}
                     </ul>
