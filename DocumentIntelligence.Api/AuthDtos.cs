@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using DocumentIntelligence.Application;
+using DocumentIntelligence.Infrastructure;
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -455,14 +456,27 @@ public static class AuthEndpoints
             }
         }).RequireAuthorization("TenantUser");
 
-        group.MapGet("/me", [Authorize] (ClaimsPrincipal user) =>
+        group.MapGet("/me", [Authorize] async (
+            ClaimsPrincipal user,
+            ApplicationDbContext db,
+            CancellationToken ct) =>
         {
             var tenantId = user.GetTenantId();
-            var email = user.GetEmail();
-            var role = user.GetRole();
-            if (tenantId == null || string.IsNullOrEmpty(email) || string.IsNullOrEmpty(role))
+            var userId = user.GetUserId();
+            if (tenantId == null || userId == null)
                 return Results.Unauthorized();
-            return Results.Ok(new AuthResponseBody(tenantId.Value.ToString(), email, role));
+
+            // Ensure the user still exists in this tenant and get the latest role/email from the database.
+            var member = await db.Users.FirstOrDefaultAsync(
+                u => u.Id == userId.Value && u.TenantId == tenantId.Value,
+                ct);
+            if (member is null)
+                return Results.Unauthorized();
+
+            return Results.Ok(new AuthResponseBody(
+                tenantId.Value.ToString(),
+                member.Email,
+                member.Role.ToString()));
         }).RequireAuthorization("TenantUser");
 
         return routes;
