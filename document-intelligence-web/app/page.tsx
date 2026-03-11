@@ -110,6 +110,7 @@ export default function Home() {
   const [authChecked, setAuthChecked] = useState(false);
   const [busyUpload, setBusyUpload] = useState(false);
   const [busyAsk, setBusyAsk] = useState(false);
+  const [busyLogout, setBusyLogout] = useState(false);
   const [showCreateWorkspaceModal, setShowCreateWorkspaceModal] = useState(false);
   const [uploadHistory, setUploadHistory] = useState<string[]>([]);
   const [uploadJustSucceeded, setUploadJustSucceeded] = useState(false);
@@ -251,6 +252,13 @@ export default function Home() {
   }
 
   async function handleLogout() {
+    if (busyLogout) return;
+    setBusyLogout(true);
+    setStatus(
+      locale === "ar"
+        ? "جاري تسجيل الخروج بأمان..."
+        : "Signing you out securely...",
+    );
     try {
       await fetch(`${getApiBase()}/auth/logout`, { method: "POST", credentials: "include" });
     } catch { /* ignore */ }
@@ -260,7 +268,6 @@ export default function Home() {
     setWorkspaces([]);
     setDocuments([]);
     setWorkspaceId("");
-    setStatus("Logged out.");
     router.replace("/signin");
   }
 
@@ -640,9 +647,19 @@ export default function Home() {
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              disabled={busyLogout}
+              className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-wait disabled:opacity-70"
             >
-              {locale === "ar" ? "تسجيل الخروج" : "Logout"}
+              {busyLogout ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400/40 border-t-transparent" />
+                  <span>
+                    {locale === "ar" ? "جاري تسجيل الخروج..." : "Signing out..."}
+                  </span>
+                </span>
+              ) : (
+                <span>{locale === "ar" ? "تسجيل الخروج" : "Logout"}</span>
+              )}
             </button>
             <AppFooter variant="compact" />
           </div>
@@ -1150,6 +1167,20 @@ export default function Home() {
           locale={locale === "ar" ? "ar" : "en"}
         />
       </div>
+      {busyLogout && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60">
+          <div className="glass-surface rounded-2xl border border-zinc-700/60 px-4 py-3 shadow-2xl">
+            <div className="flex items-center gap-3">
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-400/50 border-t-indigo-300" />
+              <p className="text-sm text-zinc-100">
+                {locale === "ar"
+                  ? "جاري إنهاء الجلسة بأمان..."
+                  : "Finishing your session safely..."}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

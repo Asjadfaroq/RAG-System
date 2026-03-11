@@ -73,6 +73,7 @@ export default function TeamPage() {
   const [joinPassword, setJoinPassword] = useState("");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
+  const [busyLogout, setBusyLogout] = useState(false);
   const [deleteWorkspaceId, setDeleteWorkspaceId] = useState<string | null>(null);
   const [showDeleteTenantModal, setShowDeleteTenantModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -187,6 +188,9 @@ export default function TeamPage() {
   }
 
   async function handleLogout() {
+    if (busyLogout) return;
+    setBusyLogout(true);
+    setStatus("Signing you out securely...");
     try {
       await fetch(`${getApiBase()}/auth/logout`, { method: "POST", credentials: "include" });
     } catch { /* ignore */ }
@@ -195,7 +199,6 @@ export default function TeamPage() {
     setActiveTenantId("");
     setWorkspaces([]);
     setWorkspaceId("");
-    setStatus("Logged out.");
     showToast("Logged out.", "success");
     router.replace("/signin");
   }
@@ -429,9 +432,17 @@ export default function TeamPage() {
             <button
               type="button"
               onClick={handleLogout}
-              className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300"
+              disabled={busyLogout}
+              className="w-full rounded-lg px-2.5 py-1.5 text-left text-xs text-red-400 transition-colors hover:bg-red-500/10 hover:text-red-300 disabled:cursor-wait disabled:opacity-70"
             >
-              Logout
+              {busyLogout ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400/40 border-t-transparent" />
+                  <span>Signing out...</span>
+                </span>
+              ) : (
+                <span>Logout</span>
+              )}
             </button>
             <AppFooter variant="compact" />
           </div>
